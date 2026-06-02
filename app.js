@@ -147,31 +147,23 @@ const modelPresets = {
 
 // State Management
 let state = {
+    onboarded: false,
+    user: {
+        username: '',
+        password: ''
+    },
     ai: {
         provider: 'gemini',
         model: 'gemini-1.5-pro',
         key: '',
         mapsKey: 'AIzaSyCfbcSDqjCdxoTbeM2CRDvL7-ite5kHOSk'
     },
-    connectors: [
-        { id: 'conn_gmail', type: 'gmail', name: 'Gmail', clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com', status: 'Connected' },
-        { id: 'conn_calendar', type: 'calendar', name: 'Google Calendar', clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com', status: 'Connected' },
-        { id: 'conn_maps', type: 'maps', name: 'Google Maps', clientId: 'OAuth Key Active', status: 'Connected' },
-        { id: 'conn_drive', type: 'drive', name: 'Google Drive', clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com', status: 'Connected' },
-        { id: 'conn_sheets', type: 'sheets', name: 'Google Sheets', clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com', status: 'Connected' },
-        { id: 'conn_slides', type: 'slides', name: 'Google Slides', clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com', status: 'Connected' },
-        { id: 'conn_forms', type: 'forms', name: 'Google Forms', clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com', status: 'Connected' },
-        { id: 'conn_tasks', type: 'tasks', name: 'Google Tasks', clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com', status: 'Connected' }
-    ],
+    connectors: [],
     mcps: [
         { id: 'mcp_1', name: 'filesystem-mcp', transport: 'stdio', command: 'npx', args: '-y @modelcontextprotocol/server-filesystem "/Users/adityadixit/My stuff/timetable_maker/Oppie"', status: 'Active' }
     ],
     logs: [
-        { time: getTime(), level: 'info', message: 'Oppie core engine initialized.' },
-        { time: getTime(), level: 'success', message: 'Google OAuth Client ID loaded: Gmail & Calendar enabled.' },
-        { time: getTime(), level: 'success', message: 'Google Maps JS API key saved.' },
-        { time: getTime(), level: 'success', message: 'Connected 7 active Google Services.' },
-        { time: getTime(), level: 'success', message: 'Started filesystem-mcp local server.' }
+        { time: getTime(), level: 'info', message: 'Oppie core engine initialized.' }
     ]
 };
 
@@ -181,22 +173,377 @@ function loadState() {
     if (stored) {
         try {
             state = JSON.parse(stored);
-            // Keep logs array structure clean
             if (!state.logs) state.logs = [];
         } catch (e) {
             console.error("Error parsing settings:", e);
         }
     } else {
+        state = {
+            onboarded: false,
+            user: {
+                username: '',
+                password: ''
+            },
+            ai: {
+                provider: 'gemini',
+                model: 'gemini-1.5-pro',
+                key: '',
+                mapsKey: 'AIzaSyCfbcSDqjCdxoTbeM2CRDvL7-ite5kHOSk'
+            },
+            connectors: [],
+            mcps: [
+                { id: 'mcp_1', name: 'filesystem-mcp', transport: 'stdio', command: 'npx', args: '-y @modelcontextprotocol/server-filesystem "/Users/adityadixit/My stuff/timetable_maker/Oppie"', status: 'Active' }
+            ],
+            logs: [
+                { time: getTime(), level: 'info', message: 'Oppie core engine initialized.' }
+            ]
+        };
         saveState();
     }
-    if (state.ai && state.ai.mapsKey) {
-        loadGoogleMapsScript(state.ai.mapsKey);
-    }
+    
+    initAppRouting();
 }
 
 function saveState() {
     localStorage.setItem('oppie_settings_google_v1', JSON.stringify(state));
 }
+
+// Onboarding and Routing logic
+function initAppRouting() {
+    const shellEl = document.querySelector('.shell');
+    const onboardingWrapper = document.getElementById('onboarding-wrapper');
+    const sidebarUsername = document.getElementById('sidebar-username-label');
+
+    // Populate Step 3 service logos wrap
+    document.querySelectorAll('.service-auth-item').forEach(item => {
+        const type = item.id.replace('auth-', '');
+        const logoWrap = item.querySelector('.service-logo-wrap');
+        if (logoWrap && serviceLogos[type]) {
+            logoWrap.innerHTML = serviceLogos[type];
+        }
+    });
+
+    if (state.onboarded) {
+        if (shellEl) shellEl.style.display = 'none';
+        if (onboardingWrapper) {
+            onboardingWrapper.style.display = 'flex';
+            onboardingWrapper.classList.remove('fade-out');
+        }
+        showOnboardingStep(0);
+    } else {
+        if (shellEl) shellEl.style.display = 'none';
+        if (onboardingWrapper) {
+            onboardingWrapper.style.display = 'flex';
+            onboardingWrapper.classList.remove('fade-out');
+        }
+        showOnboardingStep(1);
+    }
+
+    if (sidebarUsername && state.user) {
+        sidebarUsername.textContent = state.user.username || '';
+    }
+}
+
+function showOnboardingStep(step) {
+    const steps = ['login', '1', '2', '3', '4'];
+    steps.forEach(s => {
+        const el = document.getElementById(`step-${s}`);
+        if (el) {
+            el.classList.remove('active');
+        }
+    });
+
+    const progressBar = document.getElementById('onboarding-progress-bar');
+    const progressFill = document.getElementById('progress-fill');
+
+    if (step === 0 || step === 'login') {
+        if (progressBar) progressBar.style.display = 'none';
+        const loginEl = document.getElementById('step-login');
+        if (loginEl) loginEl.classList.add('active');
+        const loginLabel = document.getElementById('login-username-label');
+        if (loginLabel && state.user) {
+            loginLabel.textContent = state.user.username || 'aditya';
+        }
+    } else {
+        if (progressBar) progressBar.style.display = 'block';
+        const stepEl = document.getElementById(`step-${step}`);
+        if (stepEl) stepEl.classList.add('active');
+        
+        if (progressFill) {
+            const percentage = step * 25;
+            progressFill.style.width = `${percentage}%`;
+        }
+
+        if (step === 2) {
+            document.getElementById('onboard-provider').value = state.ai.provider || 'gemini';
+            document.getElementById('onboard-model').value = state.ai.model || 'gemini-1.5-pro';
+            document.getElementById('onboard-ai-key').value = state.ai.key || '';
+            document.getElementById('onboard-maps-key').value = state.ai.mapsKey || 'AIzaSyCfbcSDqjCdxoTbeM2CRDvL7-ite5kHOSk';
+        }
+
+        if (step === 4) {
+            const confirmUsername = document.getElementById('confirm-username');
+            const confirmEngine = document.getElementById('confirm-engine');
+            if (confirmUsername) confirmUsername.textContent = state.user.username;
+            if (confirmEngine) confirmEngine.textContent = state.ai.provider.toUpperCase();
+        }
+    }
+}
+
+// Setup Onboarding Listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // ── STEP 1 Form ──
+    const onboardingProfileForm = document.getElementById('onboarding-profile-form');
+    if (onboardingProfileForm) {
+        onboardingProfileForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('onboard-username').value.trim();
+            const password = document.getElementById('onboard-password').value.trim();
+
+            if (!username || !password) {
+                alert('Please enter both a username and master password.');
+                return;
+            }
+
+            state.user = { username, password };
+            saveState();
+            showOnboardingStep(2);
+        });
+    }
+
+    // ── STEP 2 Form ──
+    const onboardProvider = document.getElementById('onboard-provider');
+    const onboardModel = document.getElementById('onboard-model');
+    if (onboardProvider && onboardModel) {
+        onboardProvider.addEventListener('change', () => {
+            const provider = onboardProvider.value;
+            onboardModel.value = modelPresets[provider] || '';
+        });
+    }
+
+    const btnAiBack = document.getElementById('btn-ai-back');
+    if (btnAiBack) {
+        btnAiBack.addEventListener('click', () => {
+            showOnboardingStep(1);
+        });
+    }
+
+    const onboardingAiForm = document.getElementById('onboarding-ai-form');
+    if (onboardingAiForm) {
+        onboardingAiForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            state.ai.provider = document.getElementById('onboard-provider').value;
+            state.ai.model = document.getElementById('onboard-model').value;
+            state.ai.key = document.getElementById('onboard-ai-key').value;
+            state.ai.mapsKey = document.getElementById('onboard-maps-key').value;
+
+            // Sync settings panel fields
+            const aiProvSelect = document.getElementById('ai-provider');
+            const aiMdlInput = document.getElementById('ai-model');
+            const aiKyInput = document.getElementById('ai-key');
+            const mpsKyInput = document.getElementById('maps-key');
+            if (aiProvSelect) aiProvSelect.value = state.ai.provider;
+            if (aiMdlInput) aiMdlInput.value = state.ai.model;
+            if (aiKyInput) aiKyInput.value = state.ai.key;
+            if (mpsKyInput) mpsKyInput.value = state.ai.mapsKey;
+
+            saveState();
+            showOnboardingStep(3);
+        });
+    }
+
+    // ── STEP 3: Workspace Auth ──
+    const btnAuthBack = document.getElementById('btn-auth-back');
+    if (btnAuthBack) {
+        btnAuthBack.addEventListener('click', () => {
+            showOnboardingStep(2);
+        });
+    }
+
+    const btnAuthorizeWorkspace = document.getElementById('btn-authorize-workspace');
+    const btnWorkspaceNext = document.getElementById('btn-workspace-next');
+    const authSpinner = document.getElementById('auth-spinner');
+    const authBtnText = document.getElementById('auth-btn-text');
+
+    if (btnAuthorizeWorkspace) {
+        btnAuthorizeWorkspace.addEventListener('click', () => {
+            const clientId = document.getElementById('onboard-client-id').value.trim();
+            if (!clientId) {
+                alert('Please specify a Google Workspace OAuth Client ID to authorize.');
+                return;
+            }
+
+            btnAuthorizeWorkspace.disabled = true;
+            if (authSpinner) authSpinner.style.display = 'inline-block';
+            if (authBtnText) authBtnText.textContent = 'Authorizing Workspace Scopes...';
+
+            const services = ['gmail', 'calendar', 'maps', 'drive', 'sheets', 'slides', 'forms', 'tasks'];
+            services.forEach(svc => {
+                const cardEl = document.getElementById(`auth-${svc}`);
+                if (cardEl) {
+                    cardEl.classList.remove('authorized');
+                    const badge = cardEl.querySelector('.badge');
+                    if (badge) {
+                        badge.textContent = 'Pending';
+                        badge.className = 'badge badge-neutral';
+                    }
+                }
+            });
+
+            let currentSvcIndex = 0;
+            function authorizeNext() {
+                if (currentSvcIndex < services.length) {
+                    const svc = services[currentSvcIndex];
+                    const cardEl = document.getElementById(`auth-${svc}`);
+                    if (cardEl) {
+                        cardEl.classList.add('authorized');
+                        const badge = cardEl.querySelector('.badge');
+                        if (badge) {
+                            badge.textContent = 'Authorized ✓';
+                            badge.className = 'badge badge-success';
+                        }
+                    }
+                    currentSvcIndex++;
+                    setTimeout(authorizeNext, 250);
+                } else {
+                    btnAuthorizeWorkspace.disabled = false;
+                    if (authSpinner) authSpinner.style.display = 'none';
+                    if (authBtnText) authBtnText.textContent = 'Workspace Scopes Authorized ✓';
+                    if (btnWorkspaceNext) btnWorkspaceNext.disabled = false;
+
+                    state.connectors = [
+                        { id: 'conn_gmail', type: 'gmail', name: 'Gmail', clientId: clientId, status: 'Connected' },
+                        { id: 'conn_calendar', type: 'calendar', name: 'Google Calendar', clientId: clientId, status: 'Connected' },
+                        { id: 'conn_maps', type: 'maps', name: 'Google Maps', clientId: 'OAuth Key Active', status: 'Connected' },
+                        { id: 'conn_drive', type: 'drive', name: 'Google Drive', clientId: clientId, status: 'Connected' },
+                        { id: 'conn_sheets', type: 'sheets', name: 'Google Sheets', clientId: clientId, status: 'Connected' },
+                        { id: 'conn_slides', type: 'slides', name: 'Google Slides', clientId: clientId, status: 'Connected' },
+                        { id: 'conn_forms', type: 'forms', name: 'Google Forms', clientId: clientId, status: 'Connected' },
+                        { id: 'conn_tasks', type: 'tasks', name: 'Google Tasks', clientId: clientId, status: 'Connected' }
+                    ];
+                    saveState();
+                }
+            }
+            setTimeout(authorizeNext, 300);
+        });
+    }
+
+    if (btnWorkspaceNext) {
+        btnWorkspaceNext.addEventListener('click', () => {
+            showOnboardingStep(4);
+        });
+    }
+
+    // ── STEP 4: Launch ──
+    const btnLaunchApp = document.getElementById('btn-launch-app');
+    if (btnLaunchApp) {
+        btnLaunchApp.addEventListener('click', () => {
+            state.onboarded = true;
+            saveState();
+
+            const shellEl = document.querySelector('.shell');
+            const onboardingWrapper = document.getElementById('onboarding-wrapper');
+            const sidebarUsername = document.getElementById('sidebar-username-label');
+
+            if (shellEl) shellEl.style.display = 'flex';
+            if (sidebarUsername && state.user) {
+                sidebarUsername.textContent = state.user.username;
+            }
+
+            state.logs = [
+                { time: getTime(), level: 'info', message: 'Oppie core engine initialized.' },
+                { time: getTime(), level: 'success', message: `Google OAuth Client ID loaded: ${state.connectors[0].clientId}` },
+                { time: getTime(), level: 'success', message: 'Google Maps JS API key saved.' },
+                { time: getTime(), level: 'success', message: 'Connected 8 active Google Services.' },
+                { time: getTime(), level: 'success', message: 'Started filesystem-mcp local server.' },
+                { time: getTime(), level: 'success', message: `Welcome to Oppie, ${state.user.username}! All background daemons running.` }
+            ];
+            saveState();
+
+            renderConnectorsList();
+            renderSidebarConnectors();
+            renderAllLogs();
+            updateSidebarPermissions();
+
+            if (state.ai && state.ai.mapsKey) {
+                loadGoogleMapsScript(state.ai.mapsKey);
+            }
+
+            if (onboardingWrapper) {
+                onboardingWrapper.classList.add('fade-out');
+                setTimeout(() => {
+                    onboardingWrapper.style.display = 'none';
+                }, 400);
+            }
+        });
+    }
+
+    // ── STEP 0: Login Unlock ──
+    const onboardingLoginForm = document.getElementById('onboarding-login-form');
+    if (onboardingLoginForm) {
+        onboardingLoginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pwdInput = document.getElementById('login-password');
+            const enteredPassword = pwdInput.value;
+
+            if (state.user && enteredPassword === state.user.password) {
+                pwdInput.value = '';
+                
+                const shellEl = document.querySelector('.shell');
+                const onboardingWrapper = document.getElementById('onboarding-wrapper');
+                const sidebarUsername = document.getElementById('sidebar-username-label');
+
+                if (shellEl) shellEl.style.display = 'flex';
+                if (sidebarUsername && state.user) {
+                    sidebarUsername.textContent = state.user.username;
+                }
+
+                addLog('success', `Session unlocked. Welcome back, ${state.user.username}.`);
+
+                renderConnectorsList();
+                renderSidebarConnectors();
+                renderAllLogs();
+                updateSidebarPermissions();
+
+                if (state.ai && state.ai.mapsKey) {
+                    loadGoogleMapsScript(state.ai.mapsKey);
+                }
+
+                if (onboardingWrapper) {
+                    onboardingWrapper.classList.add('fade-out');
+                    setTimeout(() => {
+                        onboardingWrapper.style.display = 'none';
+                    }, 400);
+                }
+            } else {
+                alert('Incorrect Master Password. Please try again.');
+                pwdInput.value = '';
+                pwdInput.focus();
+            }
+        });
+    }
+
+    // ── Account Resets (Start Over) ──
+    const btnResetSetup = document.getElementById('btn-reset-setup');
+    if (btnResetSetup) {
+        btnResetSetup.addEventListener('click', () => {
+            if (confirm('Are you sure you want to delete your profile and start onboarding from scratch? This will clear all settings.')) {
+                localStorage.removeItem('oppie_settings_google_v1');
+                window.location.reload();
+            }
+        });
+    }
+
+    const btnSettingsReset = document.getElementById('btn-settings-reset');
+    if (btnSettingsReset) {
+        btnSettingsReset.addEventListener('click', () => {
+            if (confirm('Are you sure you want to reset Oppie? You will be logged out and all configuration will be wiped.')) {
+                localStorage.removeItem('oppie_settings_google_v1');
+                window.location.reload();
+            }
+        });
+    }
+});
 
 function scrollDown() {
     anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });

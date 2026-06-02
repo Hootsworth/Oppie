@@ -10,6 +10,191 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+<!-- ── Onboarding / Login Shell ── -->
+<div id="onboarding-wrapper" class="onboarding-wrapper">
+    <div class="onboarding-card">
+        <!-- Progress bar -->
+        <div class="onboarding-progress-bar" id="onboarding-progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        
+        <!-- STEP 0: LOGIN CARD (If already registered) -->
+        <div class="onboarding-step" id="step-login">
+            <div class="onboarding-header">
+                <h2>Welcome Back</h2>
+                <p>Unlock Oppie's local session using your master password.</p>
+            </div>
+            <form id="onboarding-login-form">
+                <div style="font-size: 13px; font-weight: 500; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e;"></span>
+                    Active Profile: <strong id="login-username-label" style="font-family:var(--mono);">aditya</strong>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Master Password</label>
+                    <input type="password" id="login-password" placeholder="Enter password..." required />
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 12px; width: 100%;">Unlock Workspace</button>
+            </form>
+            <div style="margin-top: 14px; text-align: center; border-top: 1px solid var(--gray-200); padding-top: 10px;">
+                <button type="button" class="btn-secondary" id="btn-reset-setup" style="font-size:11px; padding: 4px 8px; border-style:dashed;">Reset Local Account</button>
+            </div>
+        </div>
+
+        <!-- STEP 1: CREATE ACCOUNT (ONBOARDING) -->
+        <div class="onboarding-step" id="step-1">
+            <div class="onboarding-header">
+                <h2>Create Agent Profile</h2>
+                <p>Configure a secure local credential vault. All details remain local.</p>
+            </div>
+            <form id="onboarding-profile-form">
+                <div class="form-group">
+                    <label for="onboard-username">Profile Username</label>
+                    <input type="text" id="onboard-username" placeholder="e.g. aditya" required />
+                </div>
+                <div class="form-group">
+                    <label for="onboard-password">Master Password</label>
+                    <input type="password" id="onboard-password" placeholder="Create master password..." required />
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">Create Account & Continue</button>
+            </form>
+        </div>
+
+        <!-- STEP 2: AI ENGINE (ONBOARDING) -->
+        <div class="onboarding-step" id="step-2">
+            <div class="onboarding-header">
+                <h2>AI Engine Configuration</h2>
+                <p>Oppie executes monitors and actions autonomously using LLMs.</p>
+            </div>
+            <form id="onboarding-ai-form">
+                <div class="form-group">
+                    <label for="onboard-provider">API Provider</label>
+                    <select id="onboard-provider">
+                        <option value="gemini">Gemini (Google) - Recommended</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="claude">Claude (Anthropic)</option>
+                        <option value="openrouter">Openrouter</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="onboard-model">Model Name</label>
+                    <input type="text" id="onboard-model" value="gemini-1.5-pro" required />
+                </div>
+                <div class="form-group">
+                    <label for="onboard-ai-key">API Key</label>
+                    <input type="password" id="onboard-ai-key" placeholder="Enter key (leave empty for demo mode)..." autocomplete="off" />
+                </div>
+                <div class="form-group">
+                    <label for="onboard-maps-key">Google Maps Javascript API Key</label>
+                    <input type="password" id="onboard-maps-key" value="AIzaSyCfbcSDqjCdxoTbeM2CRDvL7-ite5kHOSk" required />
+                </div>
+                <div class="form-actions" style="margin-top:14px;">
+                    <button type="button" class="btn-secondary" id="btn-ai-back">Back</button>
+                    <button type="submit" class="btn-primary" style="flex:1;">Save & Continue</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- STEP 3: WORKSPACE CONNECTORS (ONBOARDING) -->
+        <div class="onboarding-step" id="step-3">
+            <div class="onboarding-header">
+                <h2>Connect Workspace</h2>
+                <p>Configure credentials and authorize the background polling connectors.</p>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="onboard-client-id">Google Workspace OAuth Client ID</label>
+                <input type="text" id="onboard-client-id" value="976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com" required style="font-size:12px; font-family:var(--mono);" />
+            </div>
+
+            <div class="service-auth-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                <div class="service-auth-item" id="auth-gmail" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Gmail</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+                <div class="service-auth-item" id="auth-calendar" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Calendar</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+                <div class="service-auth-item" id="auth-maps" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Maps</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+                <div class="service-auth-item" id="auth-drive" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Drive</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+                <div class="service-auth-item" id="auth-sheets" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Sheets</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+                <div class="service-auth-item" id="auth-slides" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius: 6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Slides</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+                <div class="service-auth-item" id="auth-forms" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Forms</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+                <div class="service-auth-item" id="auth-tasks" style="display:flex; align-items:center; gap:8px; padding: 8px 12px; border:1px solid var(--gray-200); border-radius:6px; background:var(--white); font-size:12px;">
+                    <span class="service-logo-wrap" style="display:inline-flex; align-items:center;"></span>
+                    <span style="flex:1;">Tasks</span>
+                    <span class="badge badge-neutral" style="font-size:8px; padding: 1px 3px;">Pending</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn-primary" id="btn-authorize-workspace" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;">
+                <span class="spinner" id="auth-spinner"></span>
+                <span id="auth-btn-text">Authorize Workspace Scopes</span>
+            </button>
+
+            <div class="form-actions" style="margin-top:14px; border-top: 1px solid var(--gray-200); padding-top:10px;">
+                <button type="button" class="btn-secondary" id="btn-auth-back">Back</button>
+                <button type="button" class="btn-primary" id="btn-workspace-next" disabled style="flex:1;">Continue</button>
+            </div>
+        </div>
+
+        <!-- STEP 4: READY (ONBOARDING) -->
+        <div class="onboarding-step" id="step-4">
+            <div class="onboarding-header">
+                <h2>Onboarding Completed</h2>
+                <p>Oppie has configured all daemons and connectors successfully.</p>
+            </div>
+            
+            <div style="background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: 14px; margin: 16px 0; font-size:12px; line-height:1.6;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                    <span style="color:var(--gray-600)">Active User Profile:</span>
+                    <strong id="confirm-username" style="font-family:var(--mono);">aditya</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                    <span style="color:var(--gray-600)">API Engine:</span>
+                    <strong id="confirm-engine" style="font-family:var(--mono); text-transform:uppercase;">GEMINI</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                    <span style="color:var(--gray-600)">Connected Connectors:</span>
+                    <strong style="color:#16a34a;">8 Allowed Scopes</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--gray-600)">Local Filesystem transport:</span>
+                    <strong style="color:#16a34a;">Active</strong>
+                </div>
+            </div>
+
+            <p style="font-size:11.5px; color:var(--gray-600); line-height:1.45; text-align:center; margin-bottom:14px;">
+                Leaving this tab open lets Oppie poll background services, parse data with the AI agent core, and notify you of completed executions in real-time.
+            </p>
+
+            <button type="button" class="btn-primary" id="btn-launch-app" style="width: 100%;">Initialize Workspace</button>
+        </div>
+    </div>
+</div>
+
 <div class="shell">
 
     <!-- ── Sidebar ── -->
@@ -18,6 +203,10 @@
             <div class="brand">
                 <span class="brand-name">Oppie</span>
                 <span class="brand-tag">autonomous agent</span>
+            </div>
+            <div class="sidebar-user" style="margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gray-600);">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.7;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Profile: <strong id="sidebar-username-label" style="font-family: var(--mono); color: var(--black);"></strong></span>
             </div>
             <div class="status-line">
                 <div class="status-bar"></div>
@@ -180,6 +369,10 @@
             <button type="button" class="settings-tab-btn" data-tab="system-logs">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="4 17 10 11 12 13 18 7"/><polyline points="13 7 18 7 18 12"/></svg>
                 System Logs
+            </button>
+            <button type="button" class="settings-tab-btn reset-btn" id="btn-settings-reset" style="margin-top: auto; border: 1px dashed rgba(220, 38, 38, 0.4); background: rgba(220, 38, 38, 0.05); color: #dc2626; border-radius: 6px; padding: 8px 12px; font-size: 13px; display: flex; align-items: center; gap: 10px; font-weight: 500; cursor: pointer; transition: background 0.2s;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Reset & Logout
             </button>
         </aside>
 

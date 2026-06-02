@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding | Oppie</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #000000;
+            --gray: #888888;
+            --light-gray: #f4f4f4;
+            --bezier: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Container that holds the sliding views */
+        .onboarding-container {
+            width: 100%;
+            max-width: 500px;
+            height: 400px;
+            position: relative;
+        }
+
+        /* Individual Step Panels */
+        .step {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 40px;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(40px) scale(0.98);
+            transition: transform 0.8s var(--bezier), opacity 0.8s var(--bezier);
+        }
+
+        .step.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(0) scale(1);
+        }
+
+        .step.exit-left {
+            opacity: 0;
+            transform: translateX(-40px) scale(0.98);
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 42px;
+            font-weight: 600;
+            letter-spacing: -0.04em;
+            line-height: 1.1;
+            margin-bottom: 16px;
+        }
+
+        p {
+            font-size: 16px;
+            color: var(--gray);
+            line-height: 1.5;
+            margin-bottom: 40px;
+        }
+
+        /* Inputs */
+        .input-group {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        input {
+            width: 100%;
+            background: var(--light-gray);
+            border: 2px solid transparent;
+            border-radius: 24px;
+            padding: 20px 24px;
+            font-size: 18px;
+            font-family: inherit;
+            color: var(--fg);
+            outline: none;
+            transition: all 0.3s var(--bezier);
+        }
+
+        input:focus {
+            background: var(--bg);
+            border-color: var(--fg);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+        }
+
+        input::placeholder {
+            color: #b0b0b0;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--fg);
+            color: var(--bg);
+            border: none;
+            border-radius: 24px;
+            padding: 20px 32px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: transform 0.3s var(--bezier), background 0.3s;
+            width: fit-content;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(2px) scale(0.98);
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--fg);
+            border: 2px solid var(--light-gray);
+            margin-top: 12px;
+        }
+
+        .btn-outline:hover {
+            border-color: var(--fg);
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* Google Icon SVG */
+        .icon {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* Progress Dots */
+        .progress {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--light-gray);
+            transition: all 0.5s var(--bezier);
+        }
+
+        .dot.active {
+            background: var(--fg);
+            width: 24px;
+            border-radius: 4px;
+        }
+
+        /* Loader */
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--light-gray);
+            border-top-color: var(--fg);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-top: 24px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="onboarding-container">
+
+        <div class="step active" id="step-1">
+            <h1>Welcome.</h1>
+            <p>Let's get to know each other. What should I call you?</p>
+
+            <div class="input-group">
+                <input type="text" id="user-name" placeholder="Enter your first name" autocomplete="off"
+                    spellcheck="false" />
+            </div>
+
+            <button class="btn" id="btn-next-1">
+                Continue
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" fill="none" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="step" id="step-2">
+            <h1>Workspace.</h1>
+            <p>To act autonomously, I need access to your Google Calendar, Mail, and Drive.</p>
+
+            <button class="btn btn-full" id="btn-google">
+                <svg class="icon" viewBox="0 0 24 24">
+                    <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        fill="currentColor" />
+                    <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        fill="currentColor" />
+                    <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        fill="currentColor" />
+                    <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        fill="currentColor" />
+                </svg>
+                Connect Google Account
+            </button>
+            <button class="btn btn-full btn-outline" id="btn-skip">Skip for now</button>
+        </div>
+
+        <div class="step" id="step-3">
+            <h1 id="final-greeting">All set.</h1>
+            <p>Configuring your autonomous agent...</p>
+            <div class="spinner"></div>
+        </div>
+
+    </div>
+
+    <div class="progress" id="progress-dots">
+        <div class="dot active"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const nameInput = document.getElementById('user-name');
+            const btnNext1 = document.getElementById('btn-next-1');
+            const btnGoogle = document.getElementById('btn-google');
+            const btnSkip = document.getElementById('btn-skip');
+            const finalGreeting = document.getElementById('final-greeting');
+
+            const steps = document.querySelectorAll('.step');
+            const dots = document.querySelectorAll('.dot');
+
+            let currentStep = 0;
+            let userName = "";
+
+            // Transition logic
+            function goToStep(index) {
+                if (index < 0 || index >= steps.length) return;
+
+                // Old step exits left
+                steps[currentStep].classList.remove('active');
+                steps[currentStep].classList.add('exit-left');
+                dots[currentStep].classList.remove('active');
+
+                currentStep = index;
+
+                // New step enters from right
+                steps[currentStep].classList.remove('exit-left');
+                steps[currentStep].classList.add('active');
+                dots[currentStep].classList.add('active');
+            }
+
+            // Step 1 -> Step 2
+            btnNext1.addEventListener('click', () => {
+                userName = nameInput.value.trim() || "there";
+                goToStep(1);
+            });
+
+            // Enter key support for input
+            nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    btnNext1.click();
+                }
+            });
+
+            // Step 2 -> Step 3 (Simulate OAuth flow)
+            function finishOnboarding(authSuccess) {
+                finalGreeting.textContent = `All set, ${userName}.`;
+                goToStep(2);
+
+                // Simulate saving state and redirecting
+                setTimeout(() => {
+                    // Replace this with actual window.location redirect logic
+                    console.log(`Setup complete. User: ${userName}, Google Auth: ${authSuccess}`);
+                }, 2000);
+            }
+
+            btnGoogle.addEventListener('click', () => {
+                const originalText = btnGoogle.innerHTML;
+                btnGoogle.innerHTML = 'Connecting...';
+                btnGoogle.style.opacity = '0.7';
+
+                // Simulate OAuth delay
+                setTimeout(() => {
+                    finishOnboarding(true);
+                }, 800);
+            });
+
+            btnSkip.addEventListener('click', () => {
+                finishOnboarding(false);
+            });
+
+            // Auto-focus input on load
+            setTimeout(() => nameInput.focus(), 500);
+        });
+    </script>
+</body>
+
+</html>
