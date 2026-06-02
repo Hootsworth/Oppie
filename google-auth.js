@@ -12,13 +12,14 @@ var GOOGLE_SCOPES = [
   'openid',
   'email',
   'profile',
-  'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/drive.readonly',
-  'https://www.googleapis.com/auth/spreadsheets.readonly',
-  'https://www.googleapis.com/auth/presentations.readonly',
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/presentations',
+  'https://www.googleapis.com/auth/forms.body',
+  'https://www.googleapis.com/auth/forms.responses.readonly',
   'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/tasks.readonly',
 ].join(' ');
@@ -574,9 +575,332 @@ async function createForm(title) {
   }
 }
 
+
+// =============================================
+// 17. fetchDocumentData(documentId)
+// =============================================
+/**
+ * Retrieve text content and structure of a Google Doc.
+ *
+ * @param {string} documentId
+ * @returns {Promise<object>} — Google Document resource.
+ */
+async function fetchDocumentData(documentId) {
+  try {
+    var url = 'https://docs.googleapis.com/v1/documents/' + encodeURIComponent(documentId);
+    var res = await googleApiFetch(url);
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] fetchDocumentData failed:', err);
+    throw new Error('Failed to fetch Google Document: ' + err.message);
+  }
+}
+
+// =============================================
+// 18. createDocument(title)
+// =============================================
+/**
+ * Create a new Google Document.
+ *
+ * @param {string} title
+ * @returns {Promise<object>} — Google Document resource.
+ */
+async function createDocument(title) {
+  try {
+    var res = await googleApiFetch('https://docs.googleapis.com/v1/documents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] createDocument failed:', err);
+    throw new Error('Failed to create Google Document: ' + err.message);
+  }
+}
+
+// =============================================
+// 19. updateDocument(documentId, requests)
+// =============================================
+/**
+ * Send batch update commands to modify a Google Document.
+ *
+ * @param {string} documentId
+ * @param {Array<object>} requests — batch update requests array.
+ * @returns {Promise<object>} — update response.
+ */
+async function updateDocument(documentId, requests) {
+  try {
+    var url = 'https://docs.googleapis.com/v1/documents/' + encodeURIComponent(documentId) + ':batchUpdate';
+    var res = await googleApiFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: requests }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] updateDocument failed:', err);
+    throw new Error('Failed to update Google Document: ' + err.message);
+  }
+}
+
+// =============================================
+// 20. updateSpreadsheetData(spreadsheetId, range, values)
+// =============================================
+/**
+ * Write/update cell values in a Google Sheet range.
+ *
+ * @param {string} spreadsheetId
+ * @param {string} range — sheet and range, e.g. "Sheet1!A1:B2"
+ * @param {Array<Array<any>>} values — 2D array of cells.
+ * @returns {Promise<object>} — update response.
+ */
+async function updateSpreadsheetData(spreadsheetId, range, values) {
+  try {
+    var url =
+      'https://sheets.googleapis.com/v4/spreadsheets/' +
+      encodeURIComponent(spreadsheetId) +
+      '/values/' +
+      encodeURIComponent(range) +
+      '?valueInputOption=RAW';
+
+    var res = await googleApiFetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: values }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] updateSpreadsheetData failed:', err);
+    throw new Error('Failed to update spreadsheet cells: ' + err.message);
+  }
+}
+
+// =============================================
+// 21. updatePresentation(presentationId, requests)
+// =============================================
+/**
+ * Update elements, slides, or texts in a Google Slides presentation.
+ *
+ * @param {string} presentationId
+ * @param {Array<object>} requests — batch update requests array.
+ * @returns {Promise<object>} — update response.
+ */
+async function updatePresentation(presentationId, requests) {
+  try {
+    var url =
+      'https://slides.googleapis.com/v1/presentations/' +
+      encodeURIComponent(presentationId) +
+      ':batchUpdate';
+
+    var res = await googleApiFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests: requests }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] updatePresentation failed:', err);
+    throw new Error('Failed to update Google Slides presentation: ' + err.message);
+  }
+}
+
+// =============================================
+// 22. fetchFormData(formId)
+// =============================================
+/**
+ * Retrieve elements and metadata of a Google Form.
+ *
+ * @param {string} formId
+ * @returns {Promise<object>} — form resource.
+ */
+async function fetchFormData(formId) {
+  try {
+    var url = 'https://forms.googleapis.com/v1/forms/' + encodeURIComponent(formId);
+    var res = await googleApiFetch(url);
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] fetchFormData failed:', err);
+    throw new Error('Failed to fetch Google Form details: ' + err.message);
+  }
+}
+
+// =============================================
+// 23. fetchFormResponses(formId)
+// =============================================
+/**
+ * Fetch survey responses submitted to a Google Form.
+ *
+ * @param {string} formId
+ * @returns {Promise<object>} — list of responses.
+ */
+async function fetchFormResponses(formId) {
+  try {
+    var url = 'https://forms.googleapis.com/v1/forms/' + encodeURIComponent(formId) + '/responses';
+    var res = await googleApiFetch(url);
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] fetchFormResponses failed:', err);
+    throw new Error('Failed to fetch Form responses: ' + err.message);
+  }
+}
+
+// =============================================
+// 24. readDriveFileContent(fileId, mimeType)
+// =============================================
+/**
+ * Fetch text/raw contents of a file in Google Drive.
+ * Exports Google Document Workspace assets (Docs, Sheets) automatically.
+ *
+ * @param {string} fileId
+ * @param {string} [mimeType='']
+ * @returns {Promise<string>} — file content.
+ */
+async function readDriveFileContent(fileId, mimeType) {
+  try {
+    var currentMime = mimeType;
+    if (!currentMime) {
+      var metaUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=mimeType';
+      var metaRes = await googleApiFetch(metaUrl);
+      var meta = await metaRes.json();
+      currentMime = meta.mimeType || '';
+    }
+
+    var url = '';
+    if (currentMime.startsWith('application/vnd.google-apps.')) {
+      var exportMime = 'text/plain';
+      if (currentMime.includes('spreadsheet')) {
+        exportMime = 'text/csv';
+      } else if (currentMime.includes('presentation')) {
+        exportMime = 'text/plain'; // Export to plaintext export if possible, otherwise we default to text/plain
+      }
+      
+      url =
+        'https://www.googleapis.com/drive/v3/files/' +
+        encodeURIComponent(fileId) +
+        '/export?mimeType=' +
+        encodeURIComponent(exportMime);
+    } else {
+      url =
+        'https://www.googleapis.com/drive/v3/files/' +
+        encodeURIComponent(fileId) +
+        '?alt=media';
+    }
+
+    var res = await googleApiFetch(url);
+    return await res.text();
+  } catch (err) {
+    console.error('[google-auth] readDriveFileContent failed:', err);
+    throw new Error('Failed to read Drive file: ' + err.message);
+  }
+}
+
+// =============================================
+// 25. createDriveFile(name, mimeType, content)
+// =============================================
+/**
+ * Create or upload a file containing plain/media text to Google Drive.
+ *
+ * @param {string} name
+ * @param {string} mimeType
+ * @param {string} [content='']
+ * @returns {Promise<object>} — created file resource.
+ */
+async function createDriveFile(name, mimeType, content) {
+  try {
+    var metadata = { name: name, mimeType: mimeType || 'text/plain' };
+    var res = await googleApiFetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metadata),
+    });
+    var file = await res.json();
+
+    if (content && file.id) {
+      var uploadUrl =
+        'https://www.googleapis.com/upload/drive/v3/files/' +
+        encodeURIComponent(file.id) +
+        '?uploadType=media';
+
+      await googleApiFetch(uploadUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': mimeType || 'text/plain' },
+        body: content,
+      });
+    }
+    return file;
+  } catch (err) {
+    console.error('[google-auth] createDriveFile failed:', err);
+    throw new Error('Failed to upload file to Google Drive: ' + err.message);
+  }
+}
+
+// =============================================
+// 26. getDirections(origin, destination, travelMode)
+// =============================================
+/**
+ * Get route information and driving directions from Google Maps REST API.
+ *
+ * @param {string} origin
+ * @param {string} destination
+ * @param {string} [travelMode='driving']
+ * @returns {Promise<object>} — Directions API response JSON.
+ */
+async function getDirections(origin, destination, travelMode) {
+  try {
+    var mode = travelMode || 'driving';
+    var mapsKey = typeof state !== 'undefined' && state.ai && state.ai.mapsKey ? state.ai.mapsKey : '';
+    if (!mapsKey) throw new Error('Google Maps Javascript API Key is missing.');
+
+    var url =
+      'https://maps.googleapis.com/maps/api/directions/json?' +
+      'origin=' + encodeURIComponent(origin) +
+      '&destination=' + encodeURIComponent(destination) +
+      '&mode=' + encodeURIComponent(mode) +
+      '&key=' + encodeURIComponent(mapsKey);
+
+    var res = await fetch(url);
+    if (!res.ok) throw new Error('Google Directions query failed with status: ' + res.status);
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] getDirections failed:', err);
+    throw new Error('Maps Directions failed: ' + err.message);
+  }
+}
+
+// =============================================
+// 27. searchPlaces(query)
+// =============================================
+/**
+ * Look up places and businesses using the Google Places REST endpoint.
+ *
+ * @param {string} query
+ * @returns {Promise<Array<object>>} — list of places results.
+ */
+async function searchPlaces(query) {
+  try {
+    var mapsKey = typeof state !== 'undefined' && state.ai && state.ai.mapsKey ? state.ai.mapsKey : '';
+    if (!mapsKey) throw new Error('Google Maps Javascript API Key is missing.');
+
+    var url =
+      'https://maps.googleapis.com/maps/api/place/textsearch/json?' +
+      'query=' + encodeURIComponent(query) +
+      '&key=' + encodeURIComponent(mapsKey);
+
+    var res = await fetch(url);
+    if (!res.ok) throw new Error('Google Places query failed with status: ' + res.status);
+    var data = await res.json();
+    return data.results || [];
+  } catch (err) {
+    console.error('[google-auth] searchPlaces failed:', err);
+    throw new Error('Places search failed: ' + err.message);
+  }
+}
+
 // =============================================
 // Internal: base64url encoding helper
 // =============================================
+
 
 /**
  * Encode a UTF-8 string to base64url (RFC 4648 §5) using browser APIs.

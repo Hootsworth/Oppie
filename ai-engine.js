@@ -197,6 +197,19 @@ var oppieTools = [
     }
   },
   {
+    name: 'updateSpreadsheetData',
+    description: 'Write or update cell values in a Google Sheet range.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        spreadsheetId: { type: 'STRING', description: 'The ID of the spreadsheet (required)' },
+        range: { type: 'STRING', description: 'Sheet and range, e.g. "Sheet1!A1:B2" (required)' },
+        values: { type: 'ARRAY', description: '2D array of cells to write, e.g. [["val1", "val2"]] (required)' }
+      },
+      required: ['spreadsheetId', 'range', 'values']
+    }
+  },
+  {
     name: 'fetchPresentationData',
     description: 'Fetch a Google Slides presentation resource structure.',
     parameters: {
@@ -219,6 +232,74 @@ var oppieTools = [
     }
   },
   {
+    name: 'updatePresentation',
+    description: 'Send batch update requests to modify a Google Slides presentation.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        presentationId: { type: 'STRING', description: 'The ID of the presentation (required)' },
+        requests: { type: 'ARRAY', description: 'Array of presentation update request objects (required)' }
+      },
+      required: ['presentationId', 'requests']
+    }
+  },
+  {
+    name: 'fetchDocumentData',
+    description: 'Retrieve text content and structural elements of a Google Document.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        documentId: { type: 'STRING', description: 'The ID of the document (required)' }
+      },
+      required: ['documentId']
+    }
+  },
+  {
+    name: 'createDocument',
+    description: 'Create a new Google Document.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'The title of the document (required)' }
+      },
+      required: ['title']
+    }
+  },
+  {
+    name: 'updateDocument',
+    description: 'Send batch update commands to insert or delete text in a Google Document.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        documentId: { type: 'STRING', description: 'The ID of the document (required)' },
+        requests: { type: 'ARRAY', description: 'Array of Docs update request objects (required)' }
+      },
+      required: ['documentId', 'requests']
+    }
+  },
+  {
+    name: 'fetchFormData',
+    description: 'Retrieve Google Form questions and settings.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        formId: { type: 'STRING', description: 'The ID of the form (required)' }
+      },
+      required: ['formId']
+    }
+  },
+  {
+    name: 'fetchFormResponses',
+    description: 'Retrieve survey responses submitted to a Google Form.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        formId: { type: 'STRING', description: 'The ID of the form (required)' }
+      },
+      required: ['formId']
+    }
+  },
+  {
     name: 'createForm',
     description: 'Create a new Google Form with the given title.',
     parameters: {
@@ -227,6 +308,55 @@ var oppieTools = [
         title: { type: 'STRING', description: 'The title of the new form (required)' }
       },
       required: ['title']
+    }
+  },
+  {
+    name: 'readDriveFileContent',
+    description: 'Read the text content of a file in Google Drive, automatically exporting workspace assets (Docs/Sheets) to plain text.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        fileId: { type: 'STRING', description: 'The ID of the file (required)' },
+        mimeType: { type: 'STRING', description: 'Optional mime type of the file' }
+      },
+      required: ['fileId']
+    }
+  },
+  {
+    name: 'createDriveFile',
+    description: 'Create or upload a file containing plain text or data into Google Drive.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        name: { type: 'STRING', description: 'Name of the file (required)' },
+        mimeType: { type: 'STRING', description: 'Mime type of the file (required)' },
+        content: { type: 'STRING', description: 'Plain text content of the file' }
+      },
+      required: ['name', 'mimeType']
+    }
+  },
+  {
+    name: 'getDirections',
+    description: 'Query routes, distances, and travel times from Google Maps directions service.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        origin: { type: 'STRING', description: 'Starting address/coordinates (required)' },
+        destination: { type: 'STRING', description: 'Ending address/coordinates (required)' },
+        travelMode: { type: 'STRING', description: 'Travel mode: driving, walking, bicycling, or transit' }
+      },
+      required: ['origin', 'destination']
+    }
+  },
+  {
+    name: 'searchPlaces',
+    description: 'Look up places, points of interest, or business details using Google Places text search.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING', description: 'Place search text, e.g. "pizza near Boston" (required)' }
+      },
+      required: ['query']
     }
   }
 ];
@@ -239,7 +369,9 @@ async function executeTool(name, args) {
     if (!lastUsedServices.includes('gmail')) lastUsedServices.push('gmail');
   } else if (name.includes('Calendar')) {
     if (!lastUsedServices.includes('calendar')) lastUsedServices.push('calendar');
-  } else if (name.includes('Drive')) {
+  } else if (name.includes('Document') || name.includes('Doc')) {
+    if (!lastUsedServices.includes('drive')) lastUsedServices.push('drive');
+  } else if (name.includes('Drive') || name.includes('File')) {
     if (!lastUsedServices.includes('drive')) lastUsedServices.push('drive');
   } else if (name.includes('Tasks')) {
     if (!lastUsedServices.includes('tasks')) lastUsedServices.push('tasks');
@@ -249,6 +381,8 @@ async function executeTool(name, args) {
     if (!lastUsedServices.includes('slides')) lastUsedServices.push('slides');
   } else if (name.includes('Form')) {
     if (!lastUsedServices.includes('forms')) lastUsedServices.push('forms');
+  } else if (name.includes('Directions') || name.includes('Places') || name.includes('Map')) {
+    if (!lastUsedServices.includes('maps')) lastUsedServices.push('maps');
   }
 
   // Execute actual function from google-auth.js
@@ -290,6 +424,10 @@ async function executeTool(name, args) {
         if (typeof createSpreadsheet !== 'function') throw new Error('createSpreadsheet API function is not loaded');
         var newSheet = await createSpreadsheet(args.title);
         return { success: true, data: newSheet };
+      case 'updateSpreadsheetData':
+        if (typeof updateSpreadsheetData !== 'function') throw new Error('updateSpreadsheetData API function is not loaded');
+        var resSheet = await updateSpreadsheetData(args.spreadsheetId, args.range, args.values);
+        return { success: true, data: resSheet };
       case 'fetchPresentationData':
         if (typeof fetchPresentationData !== 'function') throw new Error('fetchPresentationData API function is not loaded');
         var presData = await fetchPresentationData(args.presentationId);
@@ -298,10 +436,50 @@ async function executeTool(name, args) {
         if (typeof createPresentation !== 'function') throw new Error('createPresentation API function is not loaded');
         var newPres = await createPresentation(args.title);
         return { success: true, data: newPres };
+      case 'updatePresentation':
+        if (typeof updatePresentation !== 'function') throw new Error('updatePresentation API function is not loaded');
+        var resPres = await updatePresentation(args.presentationId, args.requests);
+        return { success: true, data: resPres };
+      case 'fetchDocumentData':
+        if (typeof fetchDocumentData !== 'function') throw new Error('fetchDocumentData API function is not loaded');
+        var docData = await fetchDocumentData(args.documentId);
+        return { success: true, data: docData };
+      case 'createDocument':
+        if (typeof createDocument !== 'function') throw new Error('createDocument API function is not loaded');
+        var newDoc = await createDocument(args.title);
+        return { success: true, data: newDoc };
+      case 'updateDocument':
+        if (typeof updateDocument !== 'function') throw new Error('updateDocument API function is not loaded');
+        var resDoc = await updateDocument(args.documentId, args.requests);
+        return { success: true, data: resDoc };
+      case 'fetchFormData':
+        if (typeof fetchFormData !== 'function') throw new Error('fetchFormData API function is not loaded');
+        var formData = await fetchFormData(args.formId);
+        return { success: true, data: formData };
+      case 'fetchFormResponses':
+        if (typeof fetchFormResponses !== 'function') throw new Error('fetchFormResponses API function is not loaded');
+        var formResp = await fetchFormResponses(args.formId);
+        return { success: true, data: formResp };
       case 'createForm':
         if (typeof createForm !== 'function') throw new Error('createForm API function is not loaded');
         var newForm = await createForm(args.title);
         return { success: true, data: newForm };
+      case 'readDriveFileContent':
+        if (typeof readDriveFileContent !== 'function') throw new Error('readDriveFileContent API function is not loaded');
+        var fileContent = await readDriveFileContent(args.fileId, args.mimeType);
+        return { success: true, data: fileContent };
+      case 'createDriveFile':
+        if (typeof createDriveFile !== 'function') throw new Error('createDriveFile API function is not loaded');
+        var newFile = await createDriveFile(args.name, args.mimeType, args.content);
+        return { success: true, data: newFile };
+      case 'getDirections':
+        if (typeof getDirections !== 'function') throw new Error('getDirections API function is not loaded');
+        var dirs = await getDirections(args.origin, args.destination, args.travelMode);
+        return { success: true, data: dirs };
+      case 'searchPlaces':
+        if (typeof searchPlaces !== 'function') throw new Error('searchPlaces API function is not loaded');
+        var places = await searchPlaces(args.query);
+        return { success: true, data: places };
       default:
         throw new Error(`Unknown tool name: ${name}`);
     }
