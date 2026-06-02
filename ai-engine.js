@@ -881,7 +881,7 @@ async function callOpenAI(apiKey, model, messages) {
           messages: apiMessages,
           tools: openAiTools
         };
-        var isReasoning = model.startsWith('o1') || model.startsWith('o3');
+        var isReasoning = /(^|[-/])o[0-9]+\b/.test(model);
         if (isReasoning) {
           reqBody.max_completion_tokens = 1024;
         } else {
@@ -1134,7 +1134,7 @@ async function callOpenRouter(apiKey, model, messages) {
           messages: apiMessages,
           tools: openAiTools
         };
-        var isReasoning = model.startsWith('o1') || model.startsWith('o3');
+        var isReasoning = /(^|[-/])o[0-9]+\b/.test(model);
         if (isReasoning) {
           reqBody.max_completion_tokens = 1024;
         } else {
