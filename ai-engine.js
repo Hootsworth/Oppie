@@ -204,7 +204,14 @@ var oppieTools = [
       properties: {
         spreadsheetId: { type: 'STRING', description: 'The ID of the spreadsheet (required)' },
         range: { type: 'STRING', description: 'Sheet and range, e.g. "Sheet1!A1:B2" (required)' },
-        values: { type: 'ARRAY', description: '2D array of cells to write, e.g. [["val1", "val2"]] (required)' }
+        values: {
+          type: 'ARRAY',
+          items: {
+            type: 'ARRAY',
+            items: { type: 'STRING' }
+          },
+          description: '2D array of cells to write, e.g. [["val1", "val2"]] (required)'
+        }
       },
       required: ['spreadsheetId', 'range', 'values']
     }
@@ -238,7 +245,11 @@ var oppieTools = [
       type: 'OBJECT',
       properties: {
         presentationId: { type: 'STRING', description: 'The ID of the presentation (required)' },
-        requests: { type: 'ARRAY', description: 'Array of presentation update request objects (required)' }
+        requests: {
+          type: 'ARRAY',
+          items: { type: 'OBJECT', description: 'Presentation update request object' },
+          description: 'Array of presentation update request objects (required)'
+        }
       },
       required: ['presentationId', 'requests']
     }
@@ -272,7 +283,11 @@ var oppieTools = [
       type: 'OBJECT',
       properties: {
         documentId: { type: 'STRING', description: 'The ID of the document (required)' },
-        requests: { type: 'ARRAY', description: 'Array of Docs update request objects (required)' }
+        requests: {
+          type: 'ARRAY',
+          items: { type: 'OBJECT', description: 'Docs update request object' },
+          description: 'Array of Docs update request objects (required)'
+        }
       },
       required: ['documentId', 'requests']
     }
@@ -490,8 +505,23 @@ async function executeTool(name, args) {
 }
 
 /* ----------------------------------------------------------
- *  3. History Translators
+ *  3. Parameter Casing & History Translators
  * ---------------------------------------------------------- */
+function transformSchemaTypes(schema, toUpper) {
+  if (!schema || typeof schema !== 'object') return;
+  if (schema.type && typeof schema.type === 'string') {
+    schema.type = toUpper ? schema.type.toUpperCase() : schema.type.toLowerCase();
+  }
+  if (schema.properties) {
+    Object.keys(schema.properties).forEach(function (k) {
+      transformSchemaTypes(schema.properties[k], toUpper);
+    });
+  }
+  if (schema.items) {
+    transformSchemaTypes(schema.items, toUpper);
+  }
+}
+
 function translateHistoryToGemini(history) {
   var contents = [];
   history.forEach(function (msg) {
@@ -693,14 +723,7 @@ async function callGemini(apiKey, model, messages) {
   // Convert our parameter types to uppercase
   var geminiTools = oppieTools.map(function (t) {
     var params = JSON.parse(JSON.stringify(t.parameters));
-    if (params.type) params.type = params.type.toUpperCase();
-    if (params.properties) {
-      Object.keys(params.properties).forEach(function (k) {
-        if (params.properties[k].type) {
-          params.properties[k].type = params.properties[k].type.toUpperCase();
-        }
-      });
-    }
+    transformSchemaTypes(params, true);
     return {
       name: t.name,
       description: t.description,
@@ -828,14 +851,7 @@ async function callOpenAI(apiKey, model, messages) {
   // Tools in OpenAI format (parameters in lowercase)
   var openAiTools = oppieTools.map(function (t) {
     var params = JSON.parse(JSON.stringify(t.parameters));
-    if (params.type) params.type = params.type.toLowerCase();
-    if (params.properties) {
-      Object.keys(params.properties).forEach(function (k) {
-        if (params.properties[k].type) {
-          params.properties[k].type = params.properties[k].type.toLowerCase();
-        }
-      });
-    }
+    transformSchemaTypes(params, false);
     return {
       type: 'function',
       function: {
@@ -958,14 +974,7 @@ async function callClaude(apiKey, model, messages) {
   // Tools in Claude format (parameters in lowercase)
   var claudeTools = oppieTools.map(function (t) {
     var params = JSON.parse(JSON.stringify(t.parameters));
-    if (params.type) params.type = params.type.toLowerCase();
-    if (params.properties) {
-      Object.keys(params.properties).forEach(function (k) {
-        if (params.properties[k].type) {
-          params.properties[k].type = params.properties[k].type.toLowerCase();
-        }
-      });
-    }
+    transformSchemaTypes(params, false);
     return {
       name: t.name,
       description: t.description,
@@ -1085,14 +1094,7 @@ async function callOpenRouter(apiKey, model, messages) {
   // Tools in OpenAI format for OpenRouter
   var openAiTools = oppieTools.map(function (t) {
     var params = JSON.parse(JSON.stringify(t.parameters));
-    if (params.type) params.type = params.type.toLowerCase();
-    if (params.properties) {
-      Object.keys(params.properties).forEach(function (k) {
-        if (params.properties[k].type) {
-          params.properties[k].type = params.properties[k].type.toLowerCase();
-        }
-      });
-    }
+    transformSchemaTypes(params, false);
     return {
       type: 'function',
       function: {
