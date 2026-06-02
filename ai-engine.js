@@ -879,14 +879,12 @@ async function callOpenAI(apiKey, model, messages) {
         var reqBody = {
           model: model,
           messages: apiMessages,
-          tools: openAiTools
+          tools: openAiTools,
+          max_completion_tokens: 1024
         };
         var isReasoning = /(^|[-/])o[0-9]+\b/.test(model);
-        if (isReasoning) {
-          reqBody.max_completion_tokens = 1024;
-        } else {
+        if (!isReasoning) {
           reqBody.temperature = 0.7;
-          reqBody.max_tokens = 1024;
         }
         return reqBody;
       })()),
@@ -1132,14 +1130,12 @@ async function callOpenRouter(apiKey, model, messages) {
         var reqBody = {
           model: model,
           messages: apiMessages,
-          tools: openAiTools
+          tools: openAiTools,
+          max_completion_tokens: 1024
         };
         var isReasoning = /(^|[-/])o[0-9]+\b/.test(model);
-        if (isReasoning) {
-          reqBody.max_completion_tokens = 1024;
-        } else {
+        if (!isReasoning) {
           reqBody.temperature = 0.7;
-          reqBody.max_tokens = 1024;
         }
         return reqBody;
       })()),
