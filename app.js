@@ -290,8 +290,78 @@ function showOnboardingStep(step) {
     }
 }
 
+function setWorkspaceAuthLoading(isLoading, label) {
+    const btnAuthorizeWorkspace = document.getElementById('btn-authorize-workspace');
+    const authSpinner = document.getElementById('auth-spinner');
+    const authBtnText = document.getElementById('auth-btn-text');
+
+    if (btnAuthorizeWorkspace) btnAuthorizeWorkspace.disabled = isLoading;
+    if (authSpinner) authSpinner.style.display = isLoading ? 'inline-block' : 'none';
+    if (authBtnText && label) authBtnText.textContent = label;
+}
+
+function setWorkspaceAuthCards(status) {
+    const services = ['gmail', 'calendar', 'maps', 'drive', 'sheets', 'slides', 'forms', 'tasks'];
+    services.forEach(svc => {
+        const cardEl = document.getElementById(`auth-${svc}`);
+        if (!cardEl) return;
+
+        const badge = cardEl.querySelector('.badge');
+        cardEl.classList.toggle('authorized', status === 'authorized');
+
+        if (badge) {
+            if (status === 'authorizing') {
+                badge.textContent = 'Waiting';
+                badge.className = 'badge badge-warning';
+            } else if (status === 'authorized') {
+                badge.textContent = 'Authorized';
+                badge.className = 'badge badge-success';
+            } else {
+                badge.textContent = 'Pending';
+                badge.className = 'badge badge-neutral';
+            }
+        }
+    });
+}
+
+function handleGoogleWorkspaceAuthorized(profile, accessToken) {
+    const clientIdInput = document.getElementById('onboard-client-id');
+    const btnWorkspaceNext = document.getElementById('btn-workspace-next');
+    const clientId = clientIdInput ? clientIdInput.value.trim() : GOOGLE_CLIENT_ID;
+
+    if (profile) {
+        state.user.googleName = profile.name || '';
+        state.user.googleEmail = profile.email || '';
+        state.user.googlePicture = profile.picture || '';
+    }
+
+    state.googleAccessTokenIssued = !!accessToken;
+    state.connectors = [
+        { id: 'conn_gmail', type: 'gmail', name: 'Gmail', clientId, status: 'Connected', connected: true },
+        { id: 'conn_calendar', type: 'calendar', name: 'Google Calendar', clientId, status: 'Connected', connected: true },
+        { id: 'conn_maps', type: 'maps', name: 'Google Maps', clientId: state.ai.mapsKey ? 'Maps API Key Active' : clientId, status: 'Connected', connected: true },
+        { id: 'conn_drive', type: 'drive', name: 'Google Drive', clientId, status: 'Connected', connected: true },
+        { id: 'conn_sheets', type: 'sheets', name: 'Google Sheets', clientId, status: 'Connected', connected: true },
+        { id: 'conn_slides', type: 'slides', name: 'Google Slides', clientId, status: 'Connected', connected: true },
+        { id: 'conn_forms', type: 'forms', name: 'Google Forms', clientId, status: 'Connected', connected: true },
+        { id: 'conn_tasks', type: 'tasks', name: 'Google Tasks', clientId, status: 'Connected', connected: true }
+    ];
+
+    saveState();
+    setWorkspaceAuthCards('authorized');
+    setWorkspaceAuthLoading(false, profile && profile.email ? `Connected as ${profile.email}` : 'Workspace Connected');
+    if (btnWorkspaceNext) btnWorkspaceNext.disabled = false;
+    renderConnectorsList();
+    renderSidebarConnectors();
+    updateSidebarPermissions();
+    addLog('success', `Google Workspace OAuth completed${profile && profile.email ? ` for ${profile.email}` : ''}.`);
+}
+
 // Setup Onboarding Listeners
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof initGoogleAuth === 'function') {
+        initGoogleAuth(handleGoogleWorkspaceAuthorized);
+    }
     // ── STEP 1 Form ──
     const onboardingProfileForm = document.getElementById('onboarding-profile-form');
     if (onboardingProfileForm) {
@@ -373,58 +443,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            btnAuthorizeWorkspace.disabled = true;
-            if (authSpinner) authSpinner.style.display = 'inline-block';
-            if (authBtnText) authBtnText.textContent = 'Authorizing Workspace Scopes...';
+            if (typeof GOOGLE_CLIENT_ID !== 'undefined') GOOGLE_CLIENT_ID = clientId;
+            if (typeof _tokenClient !== 'undefined') _tokenClient = null;
+            if (btnWorkspaceNext) btnWorkspaceNext.disabled = true;
+            setWorkspaceAuthCards('authorizing');
+            setWorkspaceAuthLoading(true, 'Opening Google consent...');
 
-            const services = ['gmail', 'calendar', 'maps', 'drive', 'sheets', 'slides', 'forms', 'tasks'];
-            services.forEach(svc => {
-                const cardEl = document.getElementById(`auth-${svc}`);
-                if (cardEl) {
-                    cardEl.classList.remove('authorized');
-                    const badge = cardEl.querySelector('.badge');
-                    if (badge) {
-                        badge.textContent = 'Pending';
-                        badge.className = 'badge badge-neutral';
-                    }
-                }
-            });
-
-            let currentSvcIndex = 0;
-            function authorizeNext() {
-                if (currentSvcIndex < services.length) {
-                    const svc = services[currentSvcIndex];
-                    const cardEl = document.getElementById(`auth-${svc}`);
-                    if (cardEl) {
-                        cardEl.classList.add('authorized');
-                        const badge = cardEl.querySelector('.badge');
-                        if (badge) {
-                            badge.textContent = 'Authorized ✓';
-                            badge.className = 'badge badge-success';
-                        }
-                    }
-                    currentSvcIndex++;
-                    setTimeout(authorizeNext, 250);
-                } else {
-                    btnAuthorizeWorkspace.disabled = false;
-                    if (authSpinner) authSpinner.style.display = 'none';
-                    if (authBtnText) authBtnText.textContent = 'Workspace Scopes Authorized ✓';
-                    if (btnWorkspaceNext) btnWorkspaceNext.disabled = false;
-
-                    state.connectors = [
-                        { id: 'conn_gmail', type: 'gmail', name: 'Gmail', clientId: clientId, status: 'Connected' },
-                        { id: 'conn_calendar', type: 'calendar', name: 'Google Calendar', clientId: clientId, status: 'Connected' },
-                        { id: 'conn_maps', type: 'maps', name: 'Google Maps', clientId: 'OAuth Key Active', status: 'Connected' },
-                        { id: 'conn_drive', type: 'drive', name: 'Google Drive', clientId: clientId, status: 'Connected' },
-                        { id: 'conn_sheets', type: 'sheets', name: 'Google Sheets', clientId: clientId, status: 'Connected' },
-                        { id: 'conn_slides', type: 'slides', name: 'Google Slides', clientId: clientId, status: 'Connected' },
-                        { id: 'conn_forms', type: 'forms', name: 'Google Forms', clientId: clientId, status: 'Connected' },
-                        { id: 'conn_tasks', type: 'tasks', name: 'Google Tasks', clientId: clientId, status: 'Connected' }
-                    ];
-                    saveState();
-                }
+            if (typeof requestGoogleSignIn !== 'function') {
+                setWorkspaceAuthCards('pending');
+                setWorkspaceAuthLoading(false, 'Authorize Workspace Scopes');
+                alert('Google authentication is not loaded yet. Please refresh and try again.');
+                return;
             }
-            setTimeout(authorizeNext, 300);
+
+            const launched = requestGoogleSignIn();
+            if (!launched) {
+                setWorkspaceAuthCards('pending');
+                setWorkspaceAuthLoading(false, 'Authorize Workspace Scopes');
+                alert('Google Identity Services could not be loaded. Check your network connection and try again.');
+            }
         });
     }
 
@@ -718,7 +755,8 @@ connectorForm.addEventListener('submit', (e) => {
         type,
         name,
         clientId,
-        status: 'Connected'
+        status: 'Connected',
+        connected: true
     };
 
     state.connectors.push(newConnector);
@@ -1043,10 +1081,37 @@ if (!('closedBy' in HTMLDialogElement.prototype)) {
 }
 
 // ── Chat Simulation Logic with Settings integration ──
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderMarkdown(text) {
+    let html = escapeHtml(text || '');
+
+    html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`);
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    html = html.replace(/^### (.*)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^## (.*)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^# (.*)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^\s*[-*] (.*)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)(\n<li>.*<\/li>)*/gs, match => `<ul>${match.replace(/\n/g, '')}</ul>`);
+    html = html.replace(/\n{2,}/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
+
+    return `<p>${html}</p>`.replace(/<p><\/p>/g, '');
+}
+
 function addUserMsg(text) {
     const el = document.createElement('div');
     el.className = 'msg-user';
-    el.innerHTML = `<div class="msg-user-bubble">${text}</div>`;
+    el.innerHTML = `<div class="msg-user-bubble">${escapeHtml(text)}</div>`;
     scroll.insertBefore(el, anchor);
     scrollDown();
 }
@@ -1095,7 +1160,7 @@ function addAgentMsg(actionLabel, detailHtml, replyHtml, serviceType = null) {
     scrollDown();
 }
 
-function send() {
+function sendLegacyDemo() {
     const text = input.value.trim();
     if (!text) return;
     addUserMsg(text);
@@ -1428,6 +1493,55 @@ function send() {
         sendBtn.disabled = false;
         input.focus();
     }, 1600);
+}
+
+async function send() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    addUserMsg(text);
+    input.value = '';
+    input.disabled = true;
+    sendBtn.disabled = true;
+
+    const typing = addTyping();
+    const provider = state.ai.provider || 'gemini';
+    const model = state.ai.model || modelPresets[provider] || '';
+    const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+    const serviceContext = typeof detectServiceContext === 'function' ? detectServiceContext(text) : null;
+
+    try {
+        addLog('info', `Conversational turn sent to ${providerName} (${model}).`);
+
+        if (typeof callAI !== 'function') {
+            throw new Error('AI engine is not loaded.');
+        }
+
+        const reply = await callAI(provider, model, state.ai.key, text);
+        const connectedCount = state.connectors.filter(conn => conn.connected || conn.status === 'Connected').length;
+        const actionLabel = serviceContext
+            ? `Conversation + ${serviceContext === 'capabilities' ? 'Scope' : serviceContext.charAt(0).toUpperCase() + serviceContext.slice(1)} Context`
+            : 'Conversation';
+        const detailHtml = `Model <span class="trace-tag">${escapeHtml(model)}</span> via <span class="trace-tag">${escapeHtml(providerName)}</span>. Google services connected: <span class="trace-tag">${connectedCount}</span>.`;
+
+        typing.remove();
+        addAgentMsg(actionLabel, detailHtml, renderMarkdown(reply), serviceContext);
+        addLog('success', `AI response completed for: "${text.slice(0, 48)}${text.length > 48 ? '...' : ''}"`);
+    } catch (err) {
+        typing.remove();
+        const message = err && err.message ? err.message : String(err);
+        addAgentMsg(
+            'Conversation Error',
+            `The AI runtime could not complete this turn.`,
+            renderMarkdown(`I could not complete that request yet: ${message}`),
+            serviceContext
+        );
+        addLog('error', `AI response failed: ${message}`);
+    } finally {
+        input.disabled = false;
+        sendBtn.disabled = false;
+        input.focus();
+    }
 }
 
 // Start everything up on page load
