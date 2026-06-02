@@ -88,11 +88,13 @@ function buildSystemPrompt(state, googleUser) {
     '- **Maps**: Show locations, get directions, and display points of interest\n\n' +
     '## Instructions\n' +
     '- Be conversational, concise, and friendly.\n' +
-    '- When the user asks you to monitor something, describe the background daemon you would spin up and what triggers / cadence it would use.\n' +
+    '- **Distinguish between Immediate Queries and Background Monitoring**:\n' +
+    '  - **Immediate Queries**: If the user asks to check, retrieve, search, create, update, or run something *now* (e.g., "Check my email for X", "What is on my calendar", "Create a doc named Y"), **execute the tools immediately** to get the data/perform the action, and reply with the final results right away in the response. Do NOT create or describe a background daemon for immediate queries.\n' +
+    '  - **Background Monitoring**: If the user asks you to watch, monitor, track, or automate something continuously over time (e.g., "Keep an eye out for X", "Monitor my emails for Y", "Check every hour if Z"), **then** describe the background daemon you would spin up, what triggers / cadence it would use, and how it will alert them when conditions are met.\n' +
     '- Reference Google services by their proper names (Gmail, Google Calendar, etc.).\n' +
     '- Use **Markdown** formatting in your replies (headings, bold, lists, code blocks when useful).\n' +
-    "- Don't be robotic or overly formal — you're a knowledgeable assistant who works quietly in the background.\n" +
-    '- Remember: you are a **specialised background worker**, not a general-purpose chatbot.\n';
+    "- Don't be robotic or overly formal — you're a helpful assistant.\n" +
+    '- Remember: you are a **specialised worker** with tool-calling capabilities to access Google Workspace.\n';
 
   if (state && state.ai && state.ai.customInstructions) {
     prompt += '\n## Custom Instructions from User\n' + state.ai.customInstructions + '\n';
@@ -560,7 +562,7 @@ function translateHistoryToGemini(history) {
         };
       });
       contents.push({
-        role: 'function',
+        role: 'user',
         parts: parts
       });
     }
@@ -761,16 +763,28 @@ async function callGemini(apiKey, model, messages) {
 
     var data = await res.json();
 
-    if (
-      !data.candidates ||
-      !data.candidates[0] ||
-      !data.candidates[0].content ||
-      !data.candidates[0].content.parts
-    ) {
-      throw new Error('Gemini returned an unexpected response structure.');
+    if (data.error) {
+      throw new Error('Gemini API Error: ' + data.error.message + ' (Code: ' + data.error.code + ')');
     }
 
-    var content = data.candidates[0].content;
+    if (data.promptFeedback && data.promptFeedback.blockReason) {
+      throw new Error('Gemini blocked the prompt. Reason: ' + data.promptFeedback.blockReason + '. Details: ' + JSON.stringify(data.promptFeedback));
+    }
+
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('Gemini returned a response with no candidates: ' + JSON.stringify(data));
+    }
+
+    var candidate = data.candidates[0];
+    if (candidate.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'MAX_TOKENS') {
+      throw new Error('Gemini failed to generate response. Finish Reason: ' + candidate.finishReason + '. Details: ' + JSON.stringify(candidate));
+    }
+
+    if (!candidate.content || !candidate.content.parts) {
+      throw new Error('Gemini response candidate does not contain content parts. JSON: ' + JSON.stringify(data));
+    }
+
+    var content = candidate.content;
     var parts = content.parts;
 
     // Check if the model wants to call tools
