@@ -38,19 +38,23 @@ var _onAuthSuccess = null; // callback provided by app.js
  * Initialise the GIS token client.
  *
  * @param {function(object, string)} onSuccess — called with (googleUser, googleAccessToken)
- *        after a successful sign-in / token refresh.
+ * after a successful sign-in / token refresh.
  * @returns {boolean} true if initialisation succeeded, false otherwise.
  */
 function initGoogleAuth(onSuccess) {
+  // 1. Save the callback immediately, even if the GIS library hasn't loaded yet.
+  if (onSuccess) {
+    _onAuthSuccess = onSuccess;
+  }
+
+  // 2. Then check if Google is ready.
   if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
     console.warn(
       '[google-auth] Google Identity Services library not loaded. ' +
-        'Make sure the GIS script tag is present before this file.'
+      'Make sure the GIS script tag is present before this file.'
     );
     return false;
   }
-
-  _onAuthSuccess = onSuccess || null;
 
   _tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
@@ -176,11 +180,11 @@ async function googleApiFetch(url, options) {
     }
     throw new Error(
       '[google-auth] API request failed: ' +
-        res.status +
-        ' ' +
-        res.statusText +
-        ' — ' +
-        errorBody
+      res.status +
+      ' ' +
+      res.statusText +
+      ' — ' +
+      errorBody
     );
   }
 
@@ -388,8 +392,8 @@ async function fetchTasks() {
     // Step 2 — get tasks from the first list
     var tasksRes = await googleApiFetch(
       'https://www.googleapis.com/tasks/v1/lists/' +
-        encodeURIComponent(firstListId) +
-        '/tasks'
+      encodeURIComponent(firstListId) +
+      '/tasks'
     );
     var tasksData = await tasksRes.json();
 
