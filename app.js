@@ -1508,7 +1508,7 @@ async function send() {
     const provider = state.ai.provider || 'gemini';
     const model = state.ai.model || modelPresets[provider] || '';
     const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
-    const serviceContext = typeof detectServiceContext === 'function' ? detectServiceContext(text) : null;
+    let serviceContext = typeof detectServiceContext === 'function' ? detectServiceContext(text) : null;
 
     try {
         addLog('info', `Conversational turn sent to ${providerName} (${model}).`);
@@ -1517,12 +1517,30 @@ async function send() {
             throw new Error('AI engine is not loaded.');
         }
 
-        const reply = await callAI(provider, model, state.ai.key, text);
+        let reply = await callAI(provider, model, state.ai.key, text);
+
+        // Append Demo Mode tip if no API key is specified
+        if (!state.ai.key) {
+            reply += `\n\n---\n\n> 💡 **Demo Mode**: Oppie is running in offline demo mode because no AI API Key is configured in **Settings → AI**. Add your API key to fetch real data from your connected Google Workspace!`;
+        }
+
+        const servicesUsed = typeof lastUsedServices !== 'undefined' ? lastUsedServices : [];
+        if (servicesUsed.length > 0) {
+            serviceContext = servicesUsed[0]; // Set visual logo to primary service accessed
+        }
+
         const connectedCount = state.connectors.filter(conn => conn.connected || conn.status === 'Connected').length;
-        const actionLabel = serviceContext
-            ? `Conversation + ${serviceContext === 'capabilities' ? 'Scope' : serviceContext.charAt(0).toUpperCase() + serviceContext.slice(1)} Context`
-            : 'Conversation';
-        const detailHtml = `Model <span class="trace-tag">${escapeHtml(model)}</span> via <span class="trace-tag">${escapeHtml(providerName)}</span>. Google services connected: <span class="trace-tag">${connectedCount}</span>.`;
+        const actionLabel = servicesUsed.length > 0 
+            ? `Agent Tool Execution` 
+            : (serviceContext ? `Conversation + ${serviceContext === 'capabilities' ? 'Scope' : serviceContext.charAt(0).toUpperCase() + serviceContext.slice(1)} Context` : 'Conversation');
+
+        let detailHtml = `Model <span class="trace-tag">${escapeHtml(model)}</span> via <span class="trace-tag">${escapeHtml(providerName)}</span>.`;
+        if (servicesUsed.length > 0) {
+            const serviceBadges = servicesUsed.map(s => `<span class="trace-tag" style="text-transform: capitalize;">${s}</span>`).join(', ');
+            detailHtml += ` Services accessed: ${serviceBadges}.`;
+        } else {
+            detailHtml += ` Google services connected: <span class="trace-tag">${connectedCount}</span>.`;
+        }
 
         typing.remove();
         addAgentMsg(actionLabel, detailHtml, renderMarkdown(reply), serviceContext);

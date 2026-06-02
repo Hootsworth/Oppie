@@ -448,9 +448,136 @@ async function sendGmail(to, subject, body) {
   }
 }
 
+
+// =============================================
+// 12. fetchSpreadsheetData(spreadsheetId, range)
+// =============================================
+/**
+ * Fetch values from a specific range in a Google Sheet.
+ *
+ * @param {string} spreadsheetId
+ * @param {string} range
+ * @returns {Promise<Array<Array<string>>>} — 2D array of cell values.
+ */
+async function fetchSpreadsheetData(spreadsheetId, range) {
+  try {
+    var url =
+      'https://sheets.googleapis.com/v4/spreadsheets/' +
+      encodeURIComponent(spreadsheetId) +
+      '/values/' +
+      encodeURIComponent(range);
+
+    var res = await googleApiFetch(url);
+    var data = await res.json();
+    return data.values || [];
+  } catch (err) {
+    console.error('[google-auth] fetchSpreadsheetData failed:', err);
+    throw new Error('Failed to fetch spreadsheet data: ' + err.message);
+  }
+}
+
+// =============================================
+// 13. createSpreadsheet(title)
+// =============================================
+/**
+ * Create a new spreadsheet with the given title.
+ *
+ * @param {string} title
+ * @returns {Promise<object>} — spreadsheet resource object.
+ */
+async function createSpreadsheet(title) {
+  try {
+    var res = await googleApiFetch('https://sheets.googleapis.com/v4/spreadsheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        properties: { title: title },
+      }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] createSpreadsheet failed:', err);
+    throw new Error('Failed to create spreadsheet: ' + err.message);
+  }
+}
+
+// =============================================
+// 14. fetchPresentationData(presentationId)
+// =============================================
+/**
+ * Fetch a Google Slides presentation resource structure.
+ *
+ * @param {string} presentationId
+ * @returns {Promise<object>} — presentation resource object.
+ */
+async function fetchPresentationData(presentationId) {
+  try {
+    var url =
+      'https://slides.googleapis.com/v1/presentations/' +
+      encodeURIComponent(presentationId);
+
+    var res = await googleApiFetch(url);
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] fetchPresentationData failed:', err);
+    throw new Error('Failed to fetch presentation data: ' + err.message);
+  }
+}
+
+// =============================================
+// 15. createPresentation(title)
+// =============================================
+/**
+ * Create a new Google Slides presentation.
+ *
+ * @param {string} title
+ * @returns {Promise<object>} — presentation resource object.
+ */
+async function createPresentation(title) {
+  try {
+    var res = await googleApiFetch('https://slides.googleapis.com/v1/presentations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: title,
+      }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] createPresentation failed:', err);
+    throw new Error('Failed to create presentation: ' + err.message);
+  }
+}
+
+// =============================================
+// 16. createForm(title)
+// =============================================
+/**
+ * Create a new Google Form.
+ *
+ * @param {string} title
+ * @returns {Promise<object>} — form resource object.
+ */
+async function createForm(title) {
+  try {
+    var res = await googleApiFetch('https://forms.googleapis.com/v1/forms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        info: { title: title },
+      }),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('[google-auth] createForm failed:', err);
+    throw new Error('Failed to create form: ' + err.message);
+  }
+}
+
 // =============================================
 // Internal: base64url encoding helper
 // =============================================
+
 /**
  * Encode a UTF-8 string to base64url (RFC 4648 §5) using browser APIs.
  *

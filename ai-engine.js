@@ -102,12 +102,367 @@ function buildSystemPrompt(state, googleUser) {
 }
 
 /* ----------------------------------------------------------
- *  2. callAI(provider, model, apiKey, userMessage)
+ *  2. Tool Definitions & Executers
+ * ---------------------------------------------------------- */
+var lastUsedServices = [];
+
+var oppieTools = [
+  {
+    name: 'fetchRecentEmails',
+    description: "Fetch recent email messages from the user's Gmail inbox. Supports filtering via query and limiting max results.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: { type: 'STRING', description: 'Gmail search query, e.g. "is:unread" or "from:someone"' },
+        maxResults: { type: 'INTEGER', description: 'Maximum number of emails to retrieve (default 5)' }
+      }
+    }
+  },
+  {
+    name: 'sendGmail',
+    description: 'Send an email message to a specified recipient via Gmail.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        to: { type: 'STRING', description: 'Recipient\'s email address (required)' },
+        subject: { type: 'STRING', description: 'Subject line (required)' },
+        body: { type: 'STRING', description: 'Body content of the email (required)' }
+      },
+      required: ['to', 'subject', 'body']
+    }
+  },
+  {
+    name: 'fetchCalendarEvents',
+    description: 'Fetch upcoming events from the user\'s primary Google Calendar starting from current time.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        maxResults: { type: 'INTEGER', description: 'Maximum number of events to return (default 5)' }
+      }
+    }
+  },
+  {
+    name: 'createCalendarEvent',
+    description: 'Create a new event on the user\'s primary Google Calendar.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        summary: { type: 'STRING', description: 'Event title (required)' },
+        startTime: { type: 'STRING', description: 'ISO 8601 datetime string for start time, e.g. "2026-06-03T10:00:00Z" (required)' },
+        endTime: { type: 'STRING', description: 'ISO 8601 datetime string for end time, e.g. "2026-06-03T11:00:00Z" (required)' },
+        description: { type: 'STRING', description: 'Description of the event (optional)' }
+      },
+      required: ['summary', 'startTime', 'endTime']
+    }
+  },
+  {
+    name: 'fetchDriveFiles',
+    description: 'List files from the user\'s Google Drive, ordered by most recently modified.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        maxResults: { type: 'INTEGER', description: 'Maximum number of files to return (default 10)' }
+      }
+    }
+  },
+  {
+    name: 'fetchTasks',
+    description: 'Fetch tasks from the user\'s Google Tasks list.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {}
+    }
+  },
+  {
+    name: 'fetchSpreadsheetData',
+    description: 'Fetch values from a specific Google Spreadsheet range.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        spreadsheetId: { type: 'STRING', description: 'The ID of the spreadsheet (required)' },
+        range: { type: 'STRING', description: 'Sheet and range, e.g. "Sheet1!A1:D10" (required)' }
+      },
+      required: ['spreadsheetId', 'range']
+    }
+  },
+  {
+    name: 'createSpreadsheet',
+    description: 'Create a new Google Spreadsheet with the given title.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'The title of the new spreadsheet (required)' }
+      },
+      required: ['title']
+    }
+  },
+  {
+    name: 'fetchPresentationData',
+    description: 'Fetch a Google Slides presentation resource structure.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        presentationId: { type: 'STRING', description: 'The ID of the presentation (required)' }
+      },
+      required: ['presentationId']
+    }
+  },
+  {
+    name: 'createPresentation',
+    description: 'Create a new Google Slides presentation.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'The title of the new presentation (required)' }
+      },
+      required: ['title']
+    }
+  },
+  {
+    name: 'createForm',
+    description: 'Create a new Google Form with the given title.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        title: { type: 'STRING', description: 'The title of the new form (required)' }
+      },
+      required: ['title']
+    }
+  }
+];
+
+async function executeTool(name, args) {
+  console.log(`[ai-engine] Executing tool ${name} with args:`, args);
+  
+  // Track service access
+  if (name.includes('Email') || name.includes('Gmail')) {
+    if (!lastUsedServices.includes('gmail')) lastUsedServices.push('gmail');
+  } else if (name.includes('Calendar')) {
+    if (!lastUsedServices.includes('calendar')) lastUsedServices.push('calendar');
+  } else if (name.includes('Drive')) {
+    if (!lastUsedServices.includes('drive')) lastUsedServices.push('drive');
+  } else if (name.includes('Tasks')) {
+    if (!lastUsedServices.includes('tasks')) lastUsedServices.push('tasks');
+  } else if (name.includes('Spreadsheet') || name.includes('Sheet')) {
+    if (!lastUsedServices.includes('sheets')) lastUsedServices.push('sheets');
+  } else if (name.includes('Presentation') || name.includes('Slide')) {
+    if (!lastUsedServices.includes('slides')) lastUsedServices.push('slides');
+  } else if (name.includes('Form')) {
+    if (!lastUsedServices.includes('forms')) lastUsedServices.push('forms');
+  }
+
+  // Execute actual function from google-auth.js
+  try {
+    switch (name) {
+      case 'fetchRecentEmails':
+        var query = args.query || '';
+        var maxResults = args.maxResults !== undefined ? Number(args.maxResults) : 5;
+        if (typeof fetchRecentEmails !== 'function') throw new Error('fetchRecentEmails API function is not loaded');
+        var emails = await fetchRecentEmails(query, maxResults);
+        return { success: true, data: emails };
+      case 'sendGmail':
+        if (typeof sendGmail !== 'function') throw new Error('sendGmail API function is not loaded');
+        var resGmail = await sendGmail(args.to, args.subject, args.body);
+        return { success: true, data: resGmail };
+      case 'fetchCalendarEvents':
+        var maxResCal = args.maxResults !== undefined ? Number(args.maxResults) : 5;
+        if (typeof fetchCalendarEvents !== 'function') throw new Error('fetchCalendarEvents API function is not loaded');
+        var events = await fetchCalendarEvents(maxResCal);
+        return { success: true, data: events };
+      case 'createCalendarEvent':
+        if (typeof createCalendarEvent !== 'function') throw new Error('createCalendarEvent API function is not loaded');
+        var resCal = await createCalendarEvent(args.summary, args.startTime, args.endTime, args.description);
+        return { success: true, data: resCal };
+      case 'fetchDriveFiles':
+        var maxResDrv = args.maxResults !== undefined ? Number(args.maxResults) : 10;
+        if (typeof fetchDriveFiles !== 'function') throw new Error('fetchDriveFiles API function is not loaded');
+        var files = await fetchDriveFiles(maxResDrv);
+        return { success: true, data: files };
+      case 'fetchTasks':
+        if (typeof fetchTasks !== 'function') throw new Error('fetchTasks API function is not loaded');
+        var tasks = await fetchTasks();
+        return { success: true, data: tasks };
+      case 'fetchSpreadsheetData':
+        if (typeof fetchSpreadsheetData !== 'function') throw new Error('fetchSpreadsheetData API function is not loaded');
+        var sheetVal = await fetchSpreadsheetData(args.spreadsheetId, args.range);
+        return { success: true, data: sheetVal };
+      case 'createSpreadsheet':
+        if (typeof createSpreadsheet !== 'function') throw new Error('createSpreadsheet API function is not loaded');
+        var newSheet = await createSpreadsheet(args.title);
+        return { success: true, data: newSheet };
+      case 'fetchPresentationData':
+        if (typeof fetchPresentationData !== 'function') throw new Error('fetchPresentationData API function is not loaded');
+        var presData = await fetchPresentationData(args.presentationId);
+        return { success: true, data: presData };
+      case 'createPresentation':
+        if (typeof createPresentation !== 'function') throw new Error('createPresentation API function is not loaded');
+        var newPres = await createPresentation(args.title);
+        return { success: true, data: newPres };
+      case 'createForm':
+        if (typeof createForm !== 'function') throw new Error('createForm API function is not loaded');
+        var newForm = await createForm(args.title);
+        return { success: true, data: newForm };
+      default:
+        throw new Error(`Unknown tool name: ${name}`);
+    }
+  } catch (e) {
+    console.error(`[ai-engine] Error running tool ${name}:`, e);
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
+/* ----------------------------------------------------------
+ *  3. History Translators
+ * ---------------------------------------------------------- */
+function translateHistoryToGemini(history) {
+  var contents = [];
+  history.forEach(function (msg) {
+    if (msg.role === 'user') {
+      contents.push({
+        role: 'user',
+        parts: [{ text: msg.content }]
+      });
+    } else if (msg.role === 'assistant') {
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        var parts = msg.tool_calls.map(function (tc) {
+          return {
+            functionCall: {
+              name: tc.name,
+              args: tc.args
+            }
+          };
+        });
+        contents.push({
+          role: 'model',
+          parts: parts
+        });
+      } else {
+        contents.push({
+          role: 'model',
+          parts: [{ text: msg.content || '' }]
+        });
+      }
+    } else if (msg.role === 'tool') {
+      var parts = msg.tool_responses.map(function (tr) {
+        return {
+          functionResponse: {
+            name: tr.name,
+            response: tr.response
+          }
+        };
+      });
+      contents.push({
+        role: 'function',
+        parts: parts
+      });
+    }
+  });
+  return contents;
+}
+
+function translateHistoryToOpenAI(history) {
+  var messages = [];
+  history.forEach(function (msg) {
+    if (msg.role === 'user') {
+      messages.push({
+        role: 'user',
+        content: msg.content
+      });
+    } else if (msg.role === 'assistant') {
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        var toolCalls = msg.tool_calls.map(function (tc) {
+          return {
+            id: tc.id || `call_${Math.random().toString(36).substring(7)}`,
+            type: 'function',
+            function: {
+              name: tc.name,
+              arguments: JSON.stringify(tc.args)
+            }
+          };
+        });
+        messages.push({
+          role: 'assistant',
+          tool_calls: toolCalls
+        });
+      } else {
+        messages.push({
+          role: 'assistant',
+          content: msg.content || ''
+        });
+      }
+    } else if (msg.role === 'tool') {
+      msg.tool_responses.forEach(function (tr) {
+        messages.push({
+          role: 'tool',
+          tool_call_id: tr.id || `call_${Math.random().toString(36).substring(7)}`,
+          name: tr.name,
+          content: typeof tr.response === 'string' ? tr.response : JSON.stringify(tr.response)
+        });
+      });
+    }
+  });
+  return messages;
+}
+
+function translateHistoryToClaude(history) {
+  var messages = [];
+  history.forEach(function (msg) {
+    if (msg.role === 'user') {
+      messages.push({
+        role: 'user',
+        content: msg.content
+      });
+    } else if (msg.role === 'assistant') {
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        var content = [];
+        if (msg.content) {
+          content.push({ type: 'text', text: msg.content });
+        }
+        msg.tool_calls.forEach(function (tc) {
+          content.push({
+            type: 'tool_use',
+            id: tc.id || `toolu_${Math.random().toString(36).substring(7)}`,
+            name: tc.name,
+            input: tc.args
+          });
+        });
+        messages.push({
+          role: 'assistant',
+          content: content
+        });
+      } else {
+        messages.push({
+          role: 'assistant',
+          content: msg.content || ''
+        });
+      }
+    } else if (msg.role === 'tool') {
+      var content = msg.tool_responses.map(function (tr) {
+        return {
+          type: 'tool_result',
+          tool_use_id: tr.id || `toolu_${Math.random().toString(36).substring(7)}`,
+          content: typeof tr.response === 'string' ? tr.response : JSON.stringify(tr.response)
+        };
+      });
+      messages.push({
+        role: 'user',
+        content: content
+      });
+    }
+  });
+  return messages;
+}
+
+/* ----------------------------------------------------------
+ *  4. callAI(provider, model, apiKey, userMessage)
  *  Entry point for every chat turn. Manages history, routes
  *  to the right provider, and falls back to demo mode when
  *  there is no API key.
  * ---------------------------------------------------------- */
 async function callAI(provider, model, apiKey, userMessage) {
+  // Reset the tracked services for this conversational turn
+  lastUsedServices = [];
+
   // Append the user turn
   conversationHistory.push({ role: 'user', content: userMessage });
 
@@ -141,7 +496,7 @@ async function callAI(provider, model, apiKey, userMessage) {
 }
 
 /* ----------------------------------------------------------
- *  3. callGemini(apiKey, model, messages)
+ *  5. callGemini(apiKey, model, messages)
  * ---------------------------------------------------------- */
 async function callGemini(apiKey, model, messages) {
   var url =
@@ -156,55 +511,135 @@ async function callGemini(apiKey, model, messages) {
     typeof googleUser !== 'undefined' ? googleUser : null
   );
 
-  // Map conversation history → Gemini format
-  var contents = messages.map(function (msg) {
+  // Translate tools to Gemini's format:
+  // Convert our parameter types to uppercase
+  var geminiTools = oppieTools.map(function (t) {
+    var params = JSON.parse(JSON.stringify(t.parameters));
+    if (params.type) params.type = params.type.toUpperCase();
+    if (params.properties) {
+      Object.keys(params.properties).forEach(function (k) {
+        if (params.properties[k].type) {
+          params.properties[k].type = params.properties[k].type.toUpperCase();
+        }
+      });
+    }
     return {
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
+      name: t.name,
+      description: t.description,
+      parameters: params
     };
   });
 
-  var body = {
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
-    contents: contents,
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 1024,
-    },
-  };
+  var loopCount = 0;
+  while (loopCount < 5) {
+    loopCount++;
+    var contents = translateHistoryToGemini(messages);
 
-  var res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+    var body = {
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      contents: contents,
+      tools: [{ functionDeclarations: geminiTools }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+      },
+    };
 
-  if (!res.ok) {
-    var errBody = await res.text();
-    throw new Error('Gemini API ' + res.status + ': ' + errBody);
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      var errBody = await res.text();
+      throw new Error('Gemini API ' + res.status + ': ' + errBody);
+    }
+
+    var data = await res.json();
+
+    if (
+      !data.candidates ||
+      !data.candidates[0] ||
+      !data.candidates[0].content ||
+      !data.candidates[0].content.parts
+    ) {
+      throw new Error('Gemini returned an unexpected response structure.');
+    }
+
+    var content = data.candidates[0].content;
+    var parts = content.parts;
+
+    // Check if the model wants to call tools
+    var toolCalls = [];
+    parts.forEach(function (part) {
+      if (part.functionCall) {
+        toolCalls.push({
+          name: part.functionCall.name,
+          args: part.functionCall.args || {}
+        });
+      }
+    });
+
+    if (toolCalls.length > 0) {
+      // Add tool calls to history
+      var toolCallMsg = { role: 'assistant', tool_calls: toolCalls };
+      messages.push(toolCallMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolCallMsg);
+      }
+
+      // Execute tool calls
+      var toolResponses = [];
+      for (var i = 0; i < toolCalls.length; i++) {
+        var tc = toolCalls[i];
+        if (typeof addLog === 'function') {
+          addLog('info', `Executing tool: ${tc.name}...`);
+        }
+        var toolResult = await executeTool(tc.name, tc.args);
+        
+        toolResponses.push({
+          name: tc.name,
+          response: toolResult
+        });
+      }
+
+      // Add tool responses to history
+      var toolRespMsg = { role: 'tool', tool_responses: toolResponses };
+      messages.push(toolRespMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolRespMsg);
+      }
+
+      // Continue loop
+      continue;
+    } else {
+      // It's a text response
+      var text = parts[0].text || '';
+      var assistantMsg = { role: 'assistant', content: text };
+      var alreadyPushed = false;
+      if (messages.length > 0) {
+        var last = messages[messages.length - 1];
+        if (last.role === 'assistant' && last.content === text) {
+          alreadyPushed = true;
+        }
+      }
+      if (!alreadyPushed) {
+        messages.push(assistantMsg);
+        if (messages !== conversationHistory) {
+          conversationHistory.push(assistantMsg);
+        }
+      }
+      return text;
+    }
   }
-
-  var data = await res.json();
-
-  if (
-    !data.candidates ||
-    !data.candidates[0] ||
-    !data.candidates[0].content ||
-    !data.candidates[0].content.parts ||
-    !data.candidates[0].content.parts[0]
-  ) {
-    throw new Error('Gemini returned an unexpected response structure.');
-  }
-
-  var text = data.candidates[0].content.parts[0].text;
-  conversationHistory.push({ role: 'assistant', content: text });
-  return text;
+  throw new Error('Too many tool calling iterations (max 5).');
 }
 
 /* ----------------------------------------------------------
- *  4. callOpenAI(apiKey, model, messages)
+ *  6. callOpenAI(apiKey, model, messages)
  * ---------------------------------------------------------- */
 async function callOpenAI(apiKey, model, messages) {
   var systemPrompt = buildSystemPrompt(
@@ -212,43 +647,129 @@ async function callOpenAI(apiKey, model, messages) {
     typeof googleUser !== 'undefined' ? googleUser : null
   );
 
-  var apiMessages = [{ role: 'system', content: systemPrompt }];
-  messages.forEach(function (msg) {
-    apiMessages.push({ role: msg.role, content: msg.content });
+  // Tools in OpenAI format (parameters in lowercase)
+  var openAiTools = oppieTools.map(function (t) {
+    var params = JSON.parse(JSON.stringify(t.parameters));
+    if (params.type) params.type = params.type.toLowerCase();
+    if (params.properties) {
+      Object.keys(params.properties).forEach(function (k) {
+        if (params.properties[k].type) {
+          params.properties[k].type = params.properties[k].type.toLowerCase();
+        }
+      });
+    }
+    return {
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: params
+      }
+    };
   });
 
-  var res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + apiKey,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: apiMessages,
-      temperature: 0.7,
-      max_tokens: 1024,
-    }),
-  });
+  var loopCount = 0;
+  while (loopCount < 5) {
+    loopCount++;
+    var apiMessages = [{ role: 'system', content: systemPrompt }];
+    var translated = translateHistoryToOpenAI(messages);
+    apiMessages = apiMessages.concat(translated);
 
-  if (!res.ok) {
-    var errBody = await res.text();
-    throw new Error('OpenAI API ' + res.status + ': ' + errBody);
+    var res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + apiKey,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: apiMessages,
+        tools: openAiTools,
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!res.ok) {
+      var errBody = await res.text();
+      throw new Error('OpenAI API ' + res.status + ': ' + errBody);
+    }
+
+    var data = await res.json();
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('OpenAI returned an unexpected response structure.');
+    }
+
+    var msg = data.choices[0].message;
+
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      // AI wants to call tools
+      var toolCalls = msg.tool_calls.map(function (tc) {
+        var args = {};
+        try {
+          args = JSON.parse(tc.function.arguments);
+        } catch (e) {
+          console.error('[ai-engine] Failed to parse OpenAI arguments:', e);
+        }
+        return {
+          id: tc.id,
+          name: tc.function.name,
+          args: args
+        };
+      });
+
+      var toolCallMsg = { role: 'assistant', tool_calls: toolCalls };
+      messages.push(toolCallMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolCallMsg);
+      }
+
+      var toolResponses = [];
+      for (var i = 0; i < toolCalls.length; i++) {
+        var tc = toolCalls[i];
+        if (typeof addLog === 'function') {
+          addLog('info', `Executing tool: ${tc.name}...`);
+        }
+        var toolResult = await executeTool(tc.name, tc.args);
+        toolResponses.push({
+          id: tc.id,
+          name: tc.name,
+          response: toolResult
+        });
+      }
+
+      var toolRespMsg = { role: 'tool', tool_responses: toolResponses };
+      messages.push(toolRespMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolRespMsg);
+      }
+
+      continue;
+    } else {
+      var text = msg.content || '';
+      var assistantMsg = { role: 'assistant', content: text };
+      var alreadyPushed = false;
+      if (messages.length > 0) {
+        var last = messages[messages.length - 1];
+        if (last.role === 'assistant' && last.content === text) {
+          alreadyPushed = true;
+        }
+      }
+      if (!alreadyPushed) {
+        messages.push(assistantMsg);
+        if (messages !== conversationHistory) {
+          conversationHistory.push(assistantMsg);
+        }
+      }
+      return text;
+    }
   }
-
-  var data = await res.json();
-
-  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-    throw new Error('OpenAI returned an unexpected response structure.');
-  }
-
-  var text = data.choices[0].message.content;
-  conversationHistory.push({ role: 'assistant', content: text });
-  return text;
+  throw new Error('Too many tool calling iterations (max 5).');
 }
 
 /* ----------------------------------------------------------
- *  5. callClaude(apiKey, model, messages)
+ *  7. callClaude(apiKey, model, messages)
  * ---------------------------------------------------------- */
 async function callClaude(apiKey, model, messages) {
   var systemPrompt = buildSystemPrompt(
@@ -256,45 +777,126 @@ async function callClaude(apiKey, model, messages) {
     typeof googleUser !== 'undefined' ? googleUser : null
   );
 
-  var apiMessages = messages.map(function (msg) {
-    return { role: msg.role, content: msg.content };
+  // Tools in Claude format (parameters in lowercase)
+  var claudeTools = oppieTools.map(function (t) {
+    var params = JSON.parse(JSON.stringify(t.parameters));
+    if (params.type) params.type = params.type.toLowerCase();
+    if (params.properties) {
+      Object.keys(params.properties).forEach(function (k) {
+        if (params.properties[k].type) {
+          params.properties[k].type = params.properties[k].type.toLowerCase();
+        }
+      });
+    }
+    return {
+      name: t.name,
+      description: t.description,
+      input_schema: params
+    };
   });
 
-  var res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: model,
-      system: systemPrompt,
-      messages: apiMessages,
-      temperature: 0.7,
-      max_tokens: 1024,
-    }),
-  });
+  var loopCount = 0;
+  while (loopCount < 5) {
+    loopCount++;
+    var apiMessages = translateHistoryToClaude(messages);
 
-  if (!res.ok) {
-    var errBody = await res.text();
-    throw new Error('Claude API ' + res.status + ': ' + errBody);
+    var res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: model,
+        system: systemPrompt,
+        messages: apiMessages,
+        tools: claudeTools,
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!res.ok) {
+      var errBody = await res.text();
+      throw new Error('Claude API ' + res.status + ': ' + errBody);
+    }
+
+    var data = await res.json();
+
+    if (!data.content) {
+      throw new Error('Claude returned an unexpected response structure.');
+    }
+
+    // Check content parts for tool_use blocks
+    var toolCalls = [];
+    var textParts = [];
+    data.content.forEach(function (part) {
+      if (part.type === 'tool_use') {
+        toolCalls.push({
+          id: part.id,
+          name: part.name,
+          args: part.input || {}
+        });
+      } else if (part.type === 'text') {
+        textParts.push(part.text);
+      }
+    });
+
+    var responseText = textParts.join('\n');
+
+    if (toolCalls.length > 0) {
+      var toolCallMsg = { role: 'assistant', content: responseText, tool_calls: toolCalls };
+      messages.push(toolCallMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolCallMsg);
+      }
+
+      var toolResponses = [];
+      for (var i = 0; i < toolCalls.length; i++) {
+        var tc = toolCalls[i];
+        if (typeof addLog === 'function') {
+          addLog('info', `Executing tool: ${tc.name}...`);
+        }
+        var toolResult = await executeTool(tc.name, tc.args);
+        toolResponses.push({
+          id: tc.id,
+          name: tc.name,
+          response: toolResult
+        });
+      }
+
+      var toolRespMsg = { role: 'tool', tool_responses: toolResponses };
+      messages.push(toolRespMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolRespMsg);
+      }
+
+      continue;
+    } else {
+      var assistantMsg = { role: 'assistant', content: responseText };
+      var alreadyPushed = false;
+      if (messages.length > 0) {
+        var last = messages[messages.length - 1];
+        if (last.role === 'assistant' && last.content === responseText) {
+          alreadyPushed = true;
+        }
+      }
+      if (!alreadyPushed) {
+        messages.push(assistantMsg);
+        if (messages !== conversationHistory) {
+          conversationHistory.push(assistantMsg);
+        }
+      }
+      return responseText;
+    }
   }
-
-  var data = await res.json();
-
-  if (!data.content || !data.content[0]) {
-    throw new Error('Claude returned an unexpected response structure.');
-  }
-
-  var text = data.content[0].text;
-  conversationHistory.push({ role: 'assistant', content: text });
-  return text;
+  throw new Error('Too many tool calling iterations (max 5).');
 }
 
 /* ----------------------------------------------------------
- *  6. callOpenRouter(apiKey, model, messages)
+ *  8. callOpenRouter(apiKey, model, messages)
  * ---------------------------------------------------------- */
 async function callOpenRouter(apiKey, model, messages) {
   var systemPrompt = buildSystemPrompt(
@@ -302,50 +904,137 @@ async function callOpenRouter(apiKey, model, messages) {
     typeof googleUser !== 'undefined' ? googleUser : null
   );
 
-  var apiMessages = [{ role: 'system', content: systemPrompt }];
-  messages.forEach(function (msg) {
-    apiMessages.push({ role: msg.role, content: msg.content });
+  // Tools in OpenAI format for OpenRouter
+  var openAiTools = oppieTools.map(function (t) {
+    var params = JSON.parse(JSON.stringify(t.parameters));
+    if (params.type) params.type = params.type.toLowerCase();
+    if (params.properties) {
+      Object.keys(params.properties).forEach(function (k) {
+        if (params.properties[k].type) {
+          params.properties[k].type = params.properties[k].type.toLowerCase();
+        }
+      });
+    }
+    return {
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: params
+      }
+    };
   });
 
-  var res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + apiKey,
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'Oppie Agent',
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: apiMessages,
-      temperature: 0.7,
-      max_tokens: 1024,
-    }),
-  });
+  var loopCount = 0;
+  while (loopCount < 5) {
+    loopCount++;
+    var apiMessages = [{ role: 'system', content: systemPrompt }];
+    var translated = translateHistoryToOpenAI(messages);
+    apiMessages = apiMessages.concat(translated);
 
-  if (!res.ok) {
-    var errBody = await res.text();
-    throw new Error('OpenRouter API ' + res.status + ': ' + errBody);
+    var res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + apiKey,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'Oppie Agent',
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: apiMessages,
+        tools: openAiTools,
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!res.ok) {
+      var errBody = await res.text();
+      throw new Error('OpenRouter API ' + res.status + ': ' + errBody);
+    }
+
+    var data = await res.json();
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('OpenRouter returned an unexpected response structure.');
+    }
+
+    var msg = data.choices[0].message;
+
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      // AI wants to call tools
+      var toolCalls = msg.tool_calls.map(function (tc) {
+        var args = {};
+        try {
+          args = JSON.parse(tc.function.arguments);
+        } catch (e) {
+          console.error('[ai-engine] Failed to parse OpenRouter arguments:', e);
+        }
+        return {
+          id: tc.id,
+          name: tc.function.name,
+          args: args
+        };
+      });
+
+      var toolCallMsg = { role: 'assistant', tool_calls: toolCalls };
+      messages.push(toolCallMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolCallMsg);
+      }
+
+      var toolResponses = [];
+      for (var i = 0; i < toolCalls.length; i++) {
+        var tc = toolCalls[i];
+        if (typeof addLog === 'function') {
+          addLog('info', `Executing tool: ${tc.name}...`);
+        }
+        var toolResult = await executeTool(tc.name, tc.args);
+        toolResponses.push({
+          id: tc.id,
+          name: tc.name,
+          response: toolResult
+        });
+      }
+
+      var toolRespMsg = { role: 'tool', tool_responses: toolResponses };
+      messages.push(toolRespMsg);
+      if (messages !== conversationHistory) {
+        conversationHistory.push(toolRespMsg);
+      }
+
+      continue;
+    } else {
+      var text = msg.content || '';
+      var assistantMsg = { role: 'assistant', content: text };
+      var alreadyPushed = false;
+      if (messages.length > 0) {
+        var last = messages[messages.length - 1];
+        if (last.role === 'assistant' && last.content === text) {
+          alreadyPushed = true;
+        }
+      }
+      if (!alreadyPushed) {
+        messages.push(assistantMsg);
+        if (messages !== conversationHistory) {
+          conversationHistory.push(assistantMsg);
+        }
+      }
+      return text;
+    }
   }
-
-  var data = await res.json();
-
-  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-    throw new Error('OpenRouter returned an unexpected response structure.');
-  }
-
-  var text = data.choices[0].message.content;
-  conversationHistory.push({ role: 'assistant', content: text });
-  return text;
+  throw new Error('Too many tool calling iterations (max 5).');
 }
 
 /* ----------------------------------------------------------
- *  7. generateDemoResponse(userMessage)
+ *  9. generateDemoResponse(userMessage)
  *  Smart offline / demo mode. Pattern-matches the user's
  *  message and returns a contextual reply about Oppie's
  *  capabilities — no API key required.
  * ---------------------------------------------------------- */
 function generateDemoResponse(userMessage) {
+
   var lower = userMessage.toLowerCase().trim();
 
   // Grab user's first name if available
