@@ -875,13 +875,21 @@ async function callOpenAI(apiKey, model, messages) {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + apiKey,
       },
-      body: JSON.stringify({
-        model: model,
-        messages: apiMessages,
-        tools: openAiTools,
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
+      body: JSON.stringify((function () {
+        var reqBody = {
+          model: model,
+          messages: apiMessages,
+          tools: openAiTools
+        };
+        var isReasoning = model.startsWith('o1') || model.startsWith('o3');
+        if (isReasoning) {
+          reqBody.max_completion_tokens = 1024;
+        } else {
+          reqBody.temperature = 0.7;
+          reqBody.max_tokens = 1024;
+        }
+        return reqBody;
+      })()),
     });
 
     if (!res.ok) {
@@ -1120,13 +1128,21 @@ async function callOpenRouter(apiKey, model, messages) {
         'HTTP-Referer': window.location.origin,
         'X-Title': 'Oppie Agent',
       },
-      body: JSON.stringify({
-        model: model,
-        messages: apiMessages,
-        tools: openAiTools,
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
+      body: JSON.stringify((function () {
+        var reqBody = {
+          model: model,
+          messages: apiMessages,
+          tools: openAiTools
+        };
+        var isReasoning = model.startsWith('o1') || model.startsWith('o3');
+        if (isReasoning) {
+          reqBody.max_completion_tokens = 1024;
+        } else {
+          reqBody.temperature = 0.7;
+          reqBody.max_tokens = 1024;
+        }
+        return reqBody;
+      })()),
     });
 
     if (!res.ok) {
