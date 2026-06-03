@@ -200,16 +200,29 @@ function loadState() {
         };
         saveState();
     }
-
-    initAppRouting();
 }
 
 function saveState() {
     localStorage.setItem('oppie_settings_google_v1', JSON.stringify(state));
 }
 
-// Onboarding and Routing logic
-function initAppRouting() {
+// Clerk authentication & routing handlers
+async function initializeClerk() {
+    console.log("[clerk] Initializing Clerk SDK...");
+    try {
+        await window.Clerk.load();
+        console.log("[clerk] Clerk loaded successfully.");
+        
+        window.Clerk.addListener(({ session }) => {
+            handleClerkSessionChange(session);
+        });
+    } catch (e) {
+        console.error("[clerk] Failed to load Clerk:", e);
+        addLog('error', `Clerk load error: ${e.message || String(e)}`);
+    }
+}
+
+function handleClerkSessionChange(session) {
     const shellEl = document.querySelector('.shell');
     const onboardingWrapper = document.getElementById('onboarding-wrapper');
     const sidebarUsername = document.getElementById('sidebar-username-label');
@@ -223,29 +236,86 @@ function initAppRouting() {
         }
     });
 
-    if (state.onboarded) {
+    if (!session) {
+        console.log("[clerk] User is signed out.");
         if (shellEl) shellEl.style.display = 'none';
         if (onboardingWrapper) {
             onboardingWrapper.style.display = 'flex';
             onboardingWrapper.classList.remove('fade-out');
         }
-        showOnboardingStep(0);
+        
+        showOnboardingStep('auth');
+        
+        const container = document.getElementById('clerk-auth-container');
+        if (container) {
+            container.innerHTML = '';
+            window.Clerk.mountSignIn(container, {
+                appearance: {
+                    elements: {
+                        card: {
+                            boxShadow: 'none',
+                            border: 'none',
+                            background: 'transparent'
+                        }
+                    }
+                }
+            });
+        }
     } else {
-        if (shellEl) shellEl.style.display = 'none';
-        if (onboardingWrapper) {
-            onboardingWrapper.style.display = 'flex';
-            onboardingWrapper.classList.remove('fade-out');
-        }
-        showOnboardingStep(1);
-    }
+        const user = window.Clerk.user;
+        const displayName = user.firstName || user.username || (user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress.split('@')[0] : 'user');
+        console.log(`[clerk] User is signed in: ${displayName}`);
+        
+        state.user.username = displayName;
+        saveState();
 
-    if (sidebarUsername && state.user) {
-        sidebarUsername.textContent = state.user.username || '';
+        if (sidebarUsername) {
+            sidebarUsername.textContent = displayName;
+        }
+
+        const userBtnContainer = document.getElementById('clerk-user-button');
+        if (userBtnContainer) {
+            userBtnContainer.innerHTML = '';
+            window.Clerk.mountUserButton(userBtnContainer);
+        }
+
+        if (state.onboarded) {
+            if (shellEl) shellEl.style.display = 'flex';
+            
+            if (!state.sessionUnlockedLogged) {
+                addLog('success', `Session unlocked via Clerk. Welcome back, ${displayName}.`);
+                state.sessionUnlockedLogged = true;
+                saveState();
+            }
+
+            renderConnectorsList();
+            renderSidebarConnectors();
+            renderAllLogs();
+            updateSidebarPermissions();
+
+            if (state.ai && state.ai.mapsKey) {
+                loadGoogleMapsScript(state.ai.mapsKey);
+            }
+
+            if (onboardingWrapper) {
+                onboardingWrapper.classList.add('fade-out');
+                setTimeout(() => {
+                    onboardingWrapper.style.display = 'none';
+                }, 400);
+            }
+        } else {
+            if (shellEl) shellEl.style.display = 'none';
+            if (onboardingWrapper) {
+                onboardingWrapper.style.display = 'flex';
+                onboardingWrapper.classList.remove('fade-out');
+            }
+            showOnboardingStep(2);
+        }
     }
 }
 
 function showOnboardingStep(step) {
-    const steps = ['login', '1', '2', '3', '4'];
+    const steps = ['auth', '2', '3', '4'];
     steps.forEach(s => {
         const el = document.getElementById(`step-${s}`);
         if (el) {
@@ -256,32 +326,31 @@ function showOnboardingStep(step) {
     const progressBar = document.getElementById('onboarding-progress-bar');
     const progressFill = document.getElementById('progress-fill');
 
-    if (step === 0 || step === 'login') {
+    if (step === 'auth') {
         if (progressBar) progressBar.style.display = 'none';
-        const loginEl = document.getElementById('step-login');
-        if (loginEl) loginEl.classList.add('active');
-        const loginLabel = document.getElementById('login-username-label');
-        if (loginLabel && state.user) {
-            loginLabel.textContent = state.user.username || 'aditya';
-        }
+        const authEl = document.getElementById('step-auth');
+        if (authEl) authEl.classList.add('active');
     } else {
         if (progressBar) progressBar.style.display = 'block';
         const stepEl = document.getElementById(`step-${step}`);
         if (stepEl) stepEl.classList.add('active');
 
         if (progressFill) {
-            const percentage = step * 25;
+            let percentage = 0;
+            if (step === 2 || step === '2') percentage = 33;
+            else if (step === 3 || step === '3') percentage = 66;
+            else if (step === 4 || step === '4') percentage = 100;
             progressFill.style.width = `${percentage}%`;
         }
 
-        if (step === 2) {
+        if (step === 2 || step === '2') {
             document.getElementById('onboard-provider').value = state.ai.provider || 'gemini';
             document.getElementById('onboard-model').value = state.ai.model || 'gemini-1.5-pro';
             document.getElementById('onboard-ai-key').value = state.ai.key || '';
             document.getElementById('onboard-maps-key').value = state.ai.mapsKey || 'AIzaSyCfbcSDqjCdxoTbeM2CRDvL7-ite5kHOSk';
         }
 
-        if (step === 4) {
+        if (step === 4 || step === '4') {
             const confirmUsername = document.getElementById('confirm-username');
             const confirmEngine = document.getElementById('confirm-engine');
             if (confirmUsername) confirmUsername.textContent = state.user.username;
@@ -573,9 +642,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btnSettingsReset = document.getElementById('btn-settings-reset');
     if (btnSettingsReset) {
-        btnSettingsReset.addEventListener('click', () => {
+        btnSettingsReset.addEventListener('click', async () => {
             if (confirm('Are you sure you want to reset Oppie? You will be logged out and all configuration will be wiped.')) {
                 localStorage.removeItem('oppie_settings_google_v1');
+                if (window.Clerk) {
+                    try {
+                        await window.Clerk.signOut();
+                    } catch (e) {
+                        console.error("Clerk signOut error:", e);
+                    }
+                }
                 window.location.reload();
             }
         });
@@ -1574,6 +1650,16 @@ async function send() {
 
 // Start everything up on page load
 loadState();
+
+async function checkClerkAndInit() {
+    if (window.Clerk) {
+        await initializeClerk();
+    } else {
+        setTimeout(checkClerkAndInit, 50);
+    }
+}
+checkClerkAndInit();
+
 initAiForm();
 renderConnectorsList();
 renderMcpList();

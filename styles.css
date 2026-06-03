@@ -1414,3 +1414,16 @@ dialog#settings-dialog::backdrop {
         grid-template-columns: 1fr !important;
     }
 }
+
+/* ── Clerk Authentication Overrides ── */
+#clerk-auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin-top: 5px;
+}
+.cl-card {
+    border: none !important;
+    box-shadow: none !important;
+}

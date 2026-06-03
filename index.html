@@ -8,6 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <!-- Clerk Authentication SDK -->
+    <script
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_YWN0aXZlLWtvaS0xMC5jbGVyay5hY2NvdW50cy5kZXYk"
+      src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
+      defer>
+    </script>
 </head>
 <body>
 
@@ -19,45 +26,9 @@
             <div class="progress-fill" id="progress-fill"></div>
         </div>
         
-        <!-- STEP 0: LOGIN CARD (If already registered) -->
-        <div class="onboarding-step" id="step-login">
-            <div class="onboarding-header">
-                <h2>Welcome Back</h2>
-                <p>Unlock Oppie's local session using your master password.</p>
-            </div>
-            <form id="onboarding-login-form">
-                <div style="font-size: 13px; font-weight: 500; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                    <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e;"></span>
-                    Active Profile: <strong id="login-username-label" style="font-family:var(--mono);">aditya</strong>
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Master Password</label>
-                    <input type="password" id="login-password" placeholder="Enter password..." required />
-                </div>
-                <button type="submit" class="btn-primary" style="margin-top: 12px; width: 100%;">Unlock Workspace</button>
-            </form>
-            <div style="margin-top: 14px; text-align: center; border-top: 1px solid var(--gray-200); padding-top: 10px;">
-                <button type="button" class="btn-secondary" id="btn-reset-setup" style="font-size:11px; padding: 4px 8px; border-style:dashed;">Reset Local Account</button>
-            </div>
-        </div>
-
-        <!-- STEP 1: CREATE ACCOUNT (ONBOARDING) -->
-        <div class="onboarding-step" id="step-1">
-            <div class="onboarding-header">
-                <h2>Create Agent Profile</h2>
-                <p>Configure a secure local credential vault. All details remain local.</p>
-            </div>
-            <form id="onboarding-profile-form">
-                <div class="form-group">
-                    <label for="onboard-username">Profile Username</label>
-                    <input type="text" id="onboard-username" placeholder="e.g. aditya" required />
-                </div>
-                <div class="form-group">
-                    <label for="onboard-password">Master Password</label>
-                    <input type="password" id="onboard-password" placeholder="Create master password..." required />
-                </div>
-                <button type="submit" class="btn-primary" style="margin-top: 10px; width: 100%;">Create Account & Continue</button>
-            </form>
+        <!-- CLERK AUTH STEP (Sign In / Sign Up) -->
+        <div class="onboarding-step" id="step-auth">
+            <div id="clerk-auth-container" style="display: flex; justify-content: center; width: 100%; margin: 10px 0;"></div>
         </div>
 
         <!-- STEP 2: AI ENGINE (ONBOARDING) -->
@@ -204,9 +175,12 @@
                 <span class="brand-name">Oppie</span>
                 <span class="brand-tag">autonomous agent</span>
             </div>
-            <div class="sidebar-user" style="margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gray-600);">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.7;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <span>Profile: <strong id="sidebar-username-label" style="font-family: var(--mono); color: var(--black);"></strong></span>
+            <div class="sidebar-user" style="margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--gray-600); min-height: 28px;">
+                <div id="clerk-user-button"></div>
+                <div style="display: flex; flex-direction: column;">
+                    <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-500); line-height: 1;">Signed In</span>
+                    <strong id="sidebar-username-label" style="font-family: var(--mono); color: var(--black); font-size: 11px; margin-top: 2px;"></strong>
+                </div>
             </div>
             <div class="status-line">
                 <div class="status-bar"></div>
