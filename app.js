@@ -8,7 +8,7 @@ function loadGoogleMapsScript(key) {
     if (window.google && window.google.maps) return;
     const existing = document.getElementById('google-maps-script');
     if (existing) existing.remove();
-    
+
     const script = document.createElement('script');
     script.id = 'google-maps-script';
     script.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
@@ -49,17 +49,17 @@ function renderLiveMap(containerId, locationText) {
                         {
                             "featureType": "water",
                             "elementType": "geometry",
-                            "stylers": [{"color": "#e9e9e9"}, {"lightness": 17}]
+                            "stylers": [{ "color": "#e9e9e9" }, { "lightness": 17 }]
                         },
                         {
                             "featureType": "landscape",
                             "elementType": "geometry",
-                            "stylers": [{"color": "#f5f5f5"}, {"lightness": 20}]
+                            "stylers": [{ "color": "#f5f5f5" }, { "lightness": 20 }]
                         },
                         {
                             "featureType": "road.highway",
                             "elementType": "geometry.fill",
-                            "stylers": [{"color": "#ffffff"}, {"lightness": 17}]
+                            "stylers": [{ "color": "#ffffff" }, { "lightness": 17 }]
                         }
                     ]
                 });
@@ -128,7 +128,7 @@ const mcpForm = document.getElementById('mcp-form');
 const mcpTransportSelect = document.getElementById('mcp-transport');
 const mcpStdioFields = document.getElementById('mcp-stdio-fields');
 const mcpSseFields = document.getElementById('mcp-sse-fields');
-const testMcpBtn = document.getElementById('test-mcp-btn');
+const testMcpBtn = document.getElementById('testMcpBtn');
 const mcpTestSpinner = document.getElementById('mcp-test-spinner');
 const mcpTestStatus = document.getElementById('mcp-test-status');
 const mcpListContainer = document.getElementById('mcp-list-container');
@@ -200,7 +200,7 @@ function loadState() {
         };
         saveState();
     }
-    
+
     initAppRouting();
 }
 
@@ -268,7 +268,7 @@ function showOnboardingStep(step) {
         if (progressBar) progressBar.style.display = 'block';
         const stepEl = document.getElementById(`step-${step}`);
         if (stepEl) stepEl.classList.add('active');
-        
+
         if (progressFill) {
             const percentage = step * 25;
             progressFill.style.width = `${percentage}%`;
@@ -525,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (state.user && enteredPassword === state.user.password) {
                 pwdInput.value = '';
-                
+
                 const shellEl = document.querySelector('.shell');
                 const onboardingWrapper = document.getElementById('onboarding-wrapper');
                 const sidebarUsername = document.getElementById('sidebar-username-label');
@@ -662,7 +662,7 @@ aiProviderForm.addEventListener('submit', (e) => {
         loadGoogleMapsScript(state.ai.mapsKey);
     }
     updateSidebarPermissions();
-    
+
     // Visual success alert
     const btn = aiProviderForm.querySelector('button[type="submit"]');
     const originalText = btn.textContent;
@@ -693,7 +693,7 @@ testAiBtn.addEventListener('click', () => {
     setTimeout(() => {
         aiTestSpinner.style.display = 'none';
         testAiBtn.disabled = false;
-        
+
         const keyVal = aiKeyInput.value.trim();
         if (!keyVal) {
             aiTestStatus.textContent = 'Demo Mode (No API Key)';
@@ -749,7 +749,7 @@ connectorForm.addEventListener('submit', (e) => {
     const type = connectorTypeSelect.value;
     const clientId = connectorClientIdInput.value.trim();
     const name = connectorTypeSelect.options[connectorTypeSelect.selectedIndex].text;
-    
+
     const newConnector = {
         id: 'conn_' + Date.now(),
         type,
@@ -762,7 +762,7 @@ connectorForm.addEventListener('submit', (e) => {
     state.connectors.push(newConnector);
     saveState();
     addLog('success', `Connected service: ${name} (Client ID: ${clientId.slice(0, 12)}...)`);
-    
+
     connectorClientIdInput.value = '';
     connectorTestStatus.textContent = '';
     addConnectorFormWrap.classList.remove('active');
@@ -847,6 +847,8 @@ function renderSidebarConnectors() {
     const chips = sidebarConnectors.querySelectorAll('.connector-chip');
     chips.forEach(c => c.remove());
 
+    let delayIndex = 0; // Track item count for staggering
+
     // Render oauth connectors
     state.connectors.forEach(conn => {
         const icon = connectorIcons[conn.type] || connectorIcons.gmail;
@@ -854,7 +856,11 @@ function renderSidebarConnectors() {
         chip.className = 'connector-chip';
         chip.title = `${conn.name} (Client ID: ${conn.clientId})`;
         chip.innerHTML = `${icon} ${conn.name}`;
-        
+
+        // Add staggered animation logic
+        chip.style.animation = `fadeSlideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) ${0.1 + (delayIndex * 0.05)}s both`;
+        delayIndex++;
+
         // Clicking sidebar chip opens settings at Connectors tab
         chip.addEventListener('click', () => {
             settingsDialog.showModal();
@@ -874,6 +880,10 @@ function renderSidebarConnectors() {
         chip.title = `MCP Server: ${mcp.name} (${mcp.transport})`;
         chip.innerHTML = `${mcpIcon} ${mcp.name}`;
 
+        // Add staggered animation logic
+        chip.style.animation = `fadeSlideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) ${0.1 + (delayIndex * 0.05)}s both`;
+        delayIndex++;
+
         chip.addEventListener('click', () => {
             settingsDialog.showModal();
             const btn = document.querySelector('button[data-tab="mcp-servers"]');
@@ -882,7 +892,7 @@ function renderSidebarConnectors() {
 
         sidebarConnectors.insertBefore(chip, sidebarAddBtn);
     });
-    
+
     // Update topbar sub count
     const count = state.connectors.length + state.mcps.length;
     const topbarSub = document.querySelector('.topbar-sub');
@@ -900,7 +910,7 @@ function updateSidebarPermissions() {
         activeNameEl.textContent = provider;
         activeLogoEl.innerHTML = serviceLogos[provider] || '';
     }
-    
+
     const googleCount = state.connectors.filter(c => ['gmail', 'calendar', 'maps', 'drive', 'sheets', 'slides', 'forms', 'tasks'].includes(c.type)).length;
     const activeGoogleCountEl = document.getElementById('active-google-count');
     if (activeGoogleCountEl) {
@@ -960,7 +970,7 @@ mcpForm.addEventListener('submit', (e) => {
     const transport = mcpTransportSelect.value;
     let command = '';
     let args = '';
-    
+
     if (transport === 'stdio') {
         command = document.getElementById('mcp-command').value.trim() || 'npx';
         args = document.getElementById('mcp-args').value.trim();
@@ -981,7 +991,7 @@ mcpForm.addEventListener('submit', (e) => {
     state.mcps.push(newMcp);
     saveState();
     addLog('success', `Registered MCP server: ${name} (${transport})`);
-    
+
     // Reset inputs
     document.getElementById('mcp-name').value = '';
     document.getElementById('mcp-command').value = '';
@@ -1005,8 +1015,8 @@ function renderMcpList() {
     state.mcps.forEach(mcp => {
         const el = document.createElement('div');
         el.className = 'settings-item';
-        
-        const detailText = mcp.transport === 'stdio' 
+
+        const detailText = mcp.transport === 'stdio'
             ? `Cmd: ${mcp.command} ${mcp.args}`
             : `URL: ${mcp.args}`;
 
@@ -1136,7 +1146,7 @@ function addTyping() {
 function addAgentMsg(actionLabel, detailHtml, replyHtml, serviceType = null) {
     const el = document.createElement('div');
     el.className = 'msg-agent';
-    
+
     let traceIconHtml = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
     if (serviceType && serviceLogos[serviceType]) {
         traceIconHtml = serviceLogos[serviceType];
@@ -1169,7 +1179,7 @@ function sendLegacyDemo() {
     sendBtn.disabled = true;
 
     const typing = addTyping();
-    
+
     // Analyze query keywords for connector/MCP triggers
     const textLower = text.toLowerCase();
     let matchedService = null;
@@ -1210,7 +1220,7 @@ function sendLegacyDemo() {
 
     setTimeout(() => {
         typing.remove();
-        
+
         const providerName = state.ai.provider.charAt(0).toUpperCase() + state.ai.provider.slice(1);
         const modelName = state.ai.model || modelPresets[state.ai.provider];
         const hasKey = !!state.ai.key;
@@ -1227,7 +1237,7 @@ function sendLegacyDemo() {
                 actionLabel = 'Agent Authorization Scope';
                 detailHtml = `Permissions active. Access to Google client 976947677770... and local filesystem verified.`;
                 addLog('info', 'Agent capabilities view rendered.');
-                
+
                 const activeConn = state.connectors[0] || { clientId: '976947677770-h5fm4q9mdpaafvf4t78it3nfqkjk0491.apps.googleusercontent.com' };
                 const clientShort = activeConn.clientId;
 
@@ -1282,7 +1292,7 @@ function sendLegacyDemo() {
                 detailHtml = `Executing Google integration for <span class="trace-tag">${matchedService}</span>. OAuth Client ID: <span class="trace-tag">${hasClientId.slice(0, 15)}...</span>`;
                 addLog('success', `Executed API request on Google service: ${matchedService}. OAuth client authenticated.`);
 
-                switch(matchedService) {
+                switch (matchedService) {
                     case 'gmail':
                         replyHtml = `I have successfully composed and dispatched the requested email notification using your active Gmail connector:
                             <div class="gmail-card" style="border: 1px solid var(--gray-200); border-radius: 8px; padding: 14px; margin-top: 10px; background: var(--white); box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
@@ -1484,11 +1494,11 @@ function sendLegacyDemo() {
         }
 
         addAgentMsg(actionLabel, detailHtml, replyHtml, matchedService);
-        
+
         if (mapsContainerId) {
             renderLiveMap(mapsContainerId, textLower);
         }
-        
+
         input.disabled = false;
         sendBtn.disabled = false;
         input.focus();
@@ -1530,8 +1540,8 @@ async function send() {
         }
 
         const connectedCount = state.connectors.filter(conn => conn.connected || conn.status === 'Connected').length;
-        const actionLabel = servicesUsed.length > 0 
-            ? `Agent Tool Execution` 
+        const actionLabel = servicesUsed.length > 0
+            ? `Agent Tool Execution`
             : (serviceContext ? `Conversation + ${serviceContext === 'capabilities' ? 'Scope' : serviceContext.charAt(0).toUpperCase() + serviceContext.slice(1)} Context` : 'Conversation');
 
         let detailHtml = `Model <span class="trace-tag">${escapeHtml(model)}</span> via <span class="trace-tag">${escapeHtml(providerName)}</span>.`;
